@@ -186,13 +186,12 @@ This repo uses a branch-based release workflow with GitHub Actions.
 
 ```
 1. Feature work → PR to develop (squash merge)
-2. Ready to release → create branch: release-git-sentinel-v{version} from develop
-3. PR release branch → main (merge commit)
-4. On merge → GitHub Action auto-creates:
-   - Git tag: git-sentinel-v{version}
-   - GitHub Release with auto-generated notes
-5. Update Formula/git-sentinel.rb with new tarball SHA256
-6. brew install beetlestance/tap/git-sentinel picks up the new version
+2. Ready to release → create branch: release-{tool}-v{version} from develop
+3. On release branch: bump version, update formula if needed, commit
+4. PR release branch → main (triggers GitHub Action: tag + release + auto-generated notes)
+5. PR release branch → develop (syncs version bump back)
+6. Merge both — main and develop stay in sync
+7. brew upgrade --HEAD git-sentinel picks up the new version
 ```
 
 ### Creating a release
@@ -201,15 +200,20 @@ This repo uses a branch-based release workflow with GitHub Actions.
 # From develop
 git checkout develop
 git pull origin develop
-git checkout -b release-git-sentinel-v1.0.0
+git checkout -b release-git-sentinel-v1.0.2
 
-# Push and PR to main
-git push -u origin release-git-sentinel-v1.0.0
-gh pr create --base main --title "release: git-sentinel v1.0.0"
+# Bump version in bin/git-sentinel
+# Update formula or docs if needed
+git add -A
+git commit -m "chore: bump version to v1.0.2"
+git push -u origin release-git-sentinel-v1.0.2
 
-# After merge → release is auto-created
-# Get SHA for the formula:
-curl -sL https://github.com/beetlestance/homebrew-tap/archive/refs/tags/git-sentinel-v1.0.0.tar.gz | shasum -a 256
+# Create PRs to both main and develop
+gh pr create --base main --title "release: git-sentinel v1.0.2"
+gh pr create --base develop --title "chore: sync v1.0.2 version bump to develop"
+
+# Merge both PRs
+# Main merge triggers the release workflow automatically
 ```
 
 ## License

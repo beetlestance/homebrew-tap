@@ -22,7 +22,7 @@ trap 'rm -rf "${WORK_DIR:-}"' EXIT
 # ---------------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------------
-VERSION="git-sentinel v1.0.0"
+VERSION="git-sentinel v1.0.2"
 CONFIG_PATH="./sentinel.yml"
 COMMAND=""
 
