@@ -18,13 +18,9 @@ More tools coming — each gets its own directory in this repo.
 
 This is a [Homebrew tap](https://docs.brew.sh/Taps) — a third-party repository of Homebrew formulae. Tapping adds our tools to your local Homebrew, and `brew install` handles the rest.
 
-## Contributing
+## Feedback
 
-1. Create a feature branch from `develop`
-2. Submit a PR to `develop` (squash merge enforced)
-3. Release branches merge to `main` (merge commit)
-
-See [GIT_REFERENCE.md](GIT_REFERENCE.md) for branch strategy and merge rules.
+Issues and feature requests are welcome — [open an issue](https://github.com/beetlestance/homebrew-tap/issues).
 
 ## License
 
