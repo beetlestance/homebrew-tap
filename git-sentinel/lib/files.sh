@@ -3,6 +3,15 @@
 # Requires: log.sh, config.sh (sourced before this)
 # Expects: SCRIPT_DIR set by caller
 
+# Resolve templates directory — support local dev and Homebrew install
+if [[ -d "${SCRIPT_DIR}/../share/git-sentinel/templates" ]]; then
+  TMPL_DIR="${SCRIPT_DIR}/../share/git-sentinel/templates"
+elif [[ -d "${SCRIPT_DIR}/../templates" ]]; then
+  TMPL_DIR="${SCRIPT_DIR}/../templates"
+else
+  TMPL_DIR=""
+fi
+
 generate_readme() {
   if [[ -n "$README_PATH" ]]; then
     cp "$README_PATH" README.md
@@ -40,7 +49,7 @@ generate_license() {
 }
 
 generate_git_reference() {
-  local template="$SCRIPT_DIR/../templates/GIT_REFERENCE.md"
+  local template="$TMPL_DIR/GIT_REFERENCE.md"
 
   if [[ ! -f "$template" ]]; then
     log_fail "template not found: $template"
@@ -52,7 +61,7 @@ generate_git_reference() {
 }
 
 generate_pr_template() {
-  local template="$SCRIPT_DIR/../templates/PR_TEMPLATE.md"
+  local template="$TMPL_DIR/PR_TEMPLATE.md"
 
   if [[ ! -f "$template" ]]; then
     log_fail "template not found: $template"

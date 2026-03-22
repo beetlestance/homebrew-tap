@@ -3,7 +3,13 @@ set -euo pipefail
 
 # Resolve script directory to find lib/ relative to this entrypoint
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LIB_DIR="${SCRIPT_DIR}/../lib"
+
+# Support both local dev (../lib) and Homebrew install (../lib/git-sentinel)
+if [[ -d "${SCRIPT_DIR}/../lib/git-sentinel" ]]; then
+  LIB_DIR="${SCRIPT_DIR}/../lib/git-sentinel"
+else
+  LIB_DIR="${SCRIPT_DIR}/../lib"
+fi
 
 # Source all library files
 for lib in "${LIB_DIR}"/*.sh; do
