@@ -180,6 +180,38 @@ git-sentinel/
 └── sentinel.example.yml       # Full annotated config
 ```
 
+## Release Flow
+
+This repo uses a branch-based release workflow with GitHub Actions.
+
+```
+1. Feature work → PR to develop (squash merge)
+2. Ready to release → create branch: release-git-sentinel-v{version} from develop
+3. PR release branch → main (merge commit)
+4. On merge → GitHub Action auto-creates:
+   - Git tag: git-sentinel-v{version}
+   - GitHub Release with auto-generated notes
+5. Update Formula/git-sentinel.rb with new tarball SHA256
+6. brew install beetlestance/tap/git-sentinel picks up the new version
+```
+
+### Creating a release
+
+```bash
+# From develop
+git checkout develop
+git pull origin develop
+git checkout -b release-git-sentinel-v1.0.0
+
+# Push and PR to main
+git push -u origin release-git-sentinel-v1.0.0
+gh pr create --base main --title "release: git-sentinel v1.0.0"
+
+# After merge → release is auto-created
+# Get SHA for the formula:
+curl -sL https://github.com/beetlestance/homebrew-tap/archive/refs/tags/git-sentinel-v1.0.0.tar.gz | shasum -a 256
+```
+
 ## License
 
 [GPL-3.0](../LICENSE)
