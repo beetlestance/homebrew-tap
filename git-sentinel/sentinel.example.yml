@@ -1,0 +1,50 @@
+# sentinel.yml — git-sentinel configuration reference
+# Run: git-sentinel schema > sentinel.yml  to scaffold a new config
+
+# Required: GitHub organisation or username
+org: beetlestance
+
+# Required: repository name
+repo: my-repo
+
+# Repository visibility: public or private (default: private)
+visibility: private
+
+# Short description — used in default README and GitHub repo metadata
+description: "A short description of this repo"
+
+# Number of required approving reviews before merge into main (default: 0)
+required_reviews: 0
+
+# Auto-delete feature branches after PR is merged (default: true)
+# Only affects feature/*, fix/*, release/* — protected branches (main, develop) are never deleted
+delete_branch_on_merge: true
+
+# Require review from Code Owners before merge (default: false)
+# Set to true if your repo has a CODEOWNERS file defined
+require_code_owner_review: false
+
+# Status checks — planned for future release
+# Will require specific CI check names to be defined
+# require_status_checks:
+#   - ci/build
+#   - ci/test
+
+# README source file path (optional)
+# If provided: that file is used as-is
+# If omitted: a minimal README is generated from name + description + reference links
+readme: ./README.md
+
+# License SPDX key (optional) — any key supported by GitHub's licenses API
+# If omitted: no LICENSE file is created
+license: gpl-3.0
+
+# GitHub usernames to add as collaborators on creation (optional)
+collaborators:
+  - kamesh
+
+# Templates to inject into the repo (optional)
+# Accepts file paths and/or folder paths — folder contents are copied preserving structure
+templates:
+  - ./CLAUDE.md
+  - ./company-templates/
