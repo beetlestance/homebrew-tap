@@ -1,10 +1,8 @@
 class GitSentinel < Formula
   desc "GitHub repository ruleset enforcer"
   homepage "https://github.com/beetlestance/homebrew-tap"
-  url "https://github.com/beetlestance/homebrew-tap/archive/refs/tags/git-sentinel-v1.0.0.tar.gz"
-  sha256 "dbf3342fc8bc3a4e90e8aa2ad990cac1a5fe1ea6336fe109971a8597072c2617"
+  head "https://github.com/beetlestance/homebrew-tap.git", branch: "develop"
   license "GPL-3.0"
-  version "1.0.0"
 
   depends_on "gh"
   depends_on "yq"
@@ -17,6 +15,6 @@ class GitSentinel < Formula
   end
 
   test do
-    assert_match "git-sentinel v#{version}", shell_output("#{bin}/git-sentinel version")
+    assert_match "git-sentinel v", shell_output("#{bin}/git-sentinel version")
   end
 end
