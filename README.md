@@ -1,9 +1,27 @@
 # homebrew-tap
 
-Beetlestance CLI tools — install via: brew tap beetlestance/tap
+Beetlestance CLI tools, distributed via Homebrew.
 
----
+```bash
+brew tap beetlestance/tap
+```
 
-- [License](LICENSE)
-- [Git Reference](GIT_REFERENCE.md)
-- [PR Template](.github/PULL_REQUEST_TEMPLATE.md)
+## Tools
+
+| Tool | Description | Install |
+|---|---|---|
+| [git-sentinel](git-sentinel/) | GitHub repo setup and ruleset enforcement | `brew install beetlestance/tap/git-sentinel` |
+
+More tools coming — each gets its own directory in this repo.
+
+## How It Works
+
+This is a [Homebrew tap](https://docs.brew.sh/Taps) — a third-party repository of Homebrew formulae. Tapping adds our tools to your local Homebrew, and `brew install` handles the rest.
+
+## Feedback
+
+Issues and feature requests are welcome — [open an issue](https://github.com/beetlestance/homebrew-tap/issues).
+
+## License
+
+[GPL-3.0](LICENSE)

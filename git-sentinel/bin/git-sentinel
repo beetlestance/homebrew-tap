@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Resolve script directory to find lib/ relative to this entrypoint
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Support both local dev (../lib) and Homebrew install (../lib/git-sentinel)
+if [[ -d "${SCRIPT_DIR}/../lib/git-sentinel" ]]; then
+  LIB_DIR="${SCRIPT_DIR}/../lib/git-sentinel"
+else
+  LIB_DIR="${SCRIPT_DIR}/../lib"
+fi
+
+# Source all library files
+for lib in "${LIB_DIR}"/*.sh; do
+  # shellcheck source=/dev/null
+  source "$lib"
+done
+
+trap 'rm -rf "${WORK_DIR:-}"' EXIT
+
+# ---------------------------------------------------------------------------
+# Defaults
+# ---------------------------------------------------------------------------
+VERSION="git-sentinel v1.0.0"
+CONFIG_PATH="./sentinel.yml"
+COMMAND=""
+
+# ---------------------------------------------------------------------------
+# Usage
+# ---------------------------------------------------------------------------
+usage() {
+  cat <<EOF
+Usage: git-sentinel <command> [--config <path>]
+
+Commands:
+  init      Create a new repo from sentinel.yml
+  enforce   Apply/update rulesets and files on existing repo
+  schema    Print fully annotated sentinel.yml to stdout
+  help      Show this usage message
+  version   Show installed version
+
+Options:
+  --config <path>   Path to config file (default: ./sentinel.yml)
+EOF
+}
+
+# ---------------------------------------------------------------------------
+# Argument parsing
+# ---------------------------------------------------------------------------
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    init|enforce|schema|help|version)
+      COMMAND="$1"
+      shift
+      ;;
+    --config)
+      if [[ $# -lt 2 ]]; then
+        log_fail "--config requires a path argument"
+        exit 1
+      fi
+      CONFIG_PATH="$2"
+      shift 2
+      ;;
+    *)
+      log_fail "unknown argument: $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+# ---------------------------------------------------------------------------
+# Init flow
+# ---------------------------------------------------------------------------
+cmd_init() {
+  check_dependencies
+  authenticate
+
+  log_info "reading config: $CONFIG_PATH"
+  parse_config
+  validate_config
+
+  create_repo
+  ensure_branches
+
+  # Generate files and push BEFORE rulesets lock the branch
+  generate_files
+  inject_templates
+  git add -A
+  git commit -m "Initialize repo with git-sentinel" --quiet
+  git push --quiet
+  log_ok "pushed to main"
+
+  # Sync develop with main so both branches have the generated files
+  git checkout develop --quiet
+  git merge main --quiet
+  git push origin develop --quiet
+  log_ok "synced develop with main"
+
+  # Now lock it down
+  apply_rulesets
+  add_collaborators
+
+  log_ok "done — $ORG/$REPO_NAME is ready"
+}
+
+# ---------------------------------------------------------------------------
+# Enforce flow
+# ---------------------------------------------------------------------------
+cmd_enforce() {
+  check_dependencies
+  authenticate
+
+  log_info "reading config: $CONFIG_PATH"
+  parse_config
+  validate_config
+
+  update_repo
+  ensure_branches
+
+  # Generate files and push before updating rulesets
+  generate_files
+  inject_templates
+  git add -A
+  if git diff --cached --quiet; then
+    log_skip "no changes to commit"
+  else
+    git commit -m "Enforce config with git-sentinel" --quiet
+    git push --quiet
+    log_ok "pushed to origin"
+  fi
+
+  # Now update rulesets and collaborators
+  apply_rulesets
+  add_collaborators
+
+  log_ok "done — rulesets and files enforced on $ORG/$REPO_NAME"
+}
+
+# ---------------------------------------------------------------------------
+# Command dispatch
+# ---------------------------------------------------------------------------
+case "${COMMAND}" in
+  init)    cmd_init ;;
+  enforce) cmd_enforce ;;
+  schema)  schema ;;
+  help)    usage ;;
+  version) echo "$VERSION" ;;
+  *)
+    usage
+    exit 1
+    ;;
+esac
