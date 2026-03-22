@@ -81,8 +81,8 @@ create_or_update_ruleset() {
 }
 
 apply_rulesets() {
-  # main: merge commits only, user-configured reviews and code owner setting
-  create_or_update_ruleset "protect-main" "refs/heads/main" "$REQUIRED_REVIEWS" '["merge"]' "$REQUIRE_CODE_OWNER_REVIEW"
+  # main: merge + rebase allowed (rebase enables ff push by bypass actors), no linear history
+  create_or_update_ruleset "protect-main" "refs/heads/main" "$REQUIRED_REVIEWS" '["merge","rebase"]' "$REQUIRE_CODE_OWNER_REVIEW"
 
   # develop: squash merge only, 0 reviews, no code owner review
   create_or_update_ruleset "protect-develop" "refs/heads/develop" 0 '["squash"]' false
