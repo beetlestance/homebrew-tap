@@ -11,16 +11,21 @@ ensure_branches() {
   fi
 
   for branch in "${branches[@]}"; do
-    if git ls-remote --heads origin "$branch" | grep -q "$branch"; then
-      log_skip "branch: $branch (already exists)"
-    else
-      git branch "$branch" &>/dev/null
-      git push -u origin "$branch" &>/dev/null || {
-        log_fail "failed to push branch: $branch"
-        exit "$EXIT_GITHUB_ERROR"
-      }
-      log_ok "branch created: $branch"
+    if git ls-remote --heads origin "$branch" 2>/dev/null | grep -q "$branch"; then
+      log_skip "branch: $branch (already on remote)"
+      continue
     fi
+
+    # Create local branch if it doesn't exist yet
+    if ! git show-ref --verify --quiet "refs/heads/$branch"; then
+      git branch "$branch" &>/dev/null
+    fi
+
+    git push -u origin "$branch" &>/dev/null || {
+      log_fail "failed to push branch: $branch"
+      exit "$EXIT_GITHUB_ERROR"
+    }
+    log_ok "branch created: $branch"
   done
 
   # Set develop as the default branch

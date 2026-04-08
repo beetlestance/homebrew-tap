@@ -128,6 +128,9 @@ build/
 
 # Logs
 *.log
+
+# git-sentinel config — runtime-only, never committed
+sentinel.yml
 EOF
   log_ok ".gitignore"
 }

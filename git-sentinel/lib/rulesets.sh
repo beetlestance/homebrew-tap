@@ -52,9 +52,12 @@ create_or_update_ruleset() {
       ]
     }')
 
+  # The rulesets API normally returns an array, but on errors or unexpected
+  # shapes (e.g. an error object) it can return something else. Guard the jq
+  # iteration so we don't blow up with "Cannot index string with string".
   local existing
   existing=$(gh_api "/repos/$ORG/$REPO_NAME/rulesets" 2>/dev/null \
-    | jq -r --arg name "$name" '.[] | select(.name == $name)')
+    | jq -r --arg name "$name" 'if type=="array" then (.[] | select(.name == $name)) else empty end')
 
   if [[ -n "$existing" ]]; then
     local ruleset_id

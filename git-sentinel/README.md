@@ -31,18 +31,23 @@ bash bin/git-sentinel help
 ## Quick Start
 
 ```bash
-# Scaffold a config
+# Make a directory matching the repo name and cd in
+mkdir my-repo && cd my-repo
+
+# Scaffold a config (runtime-only — will be removed automatically after init)
 git-sentinel schema > sentinel.yml
+vim sentinel.yml      # set org, repo, etc.
 
-# Edit it
-vim sentinel.yml
-
-# Create a new repo
+# Create the GitHub repo and initialize this directory in place
 git-sentinel init
 
-# Update an existing repo
+# Or, on an existing repo: cd in and update
 git-sentinel enforce
 ```
+
+> `git-sentinel init` initializes the **current directory** as the working tree
+> (no temp clones). The cwd's basename must match `repo:` in `sentinel.yml`.
+> `sentinel.yml` is gitignored and removed from the working tree once init succeeds.
 
 ## Commands
 
@@ -61,12 +66,14 @@ Only flag: `--config <path>` (default: `./sentinel.yml`)
 ### On `init`
 
 1. Creates the GitHub repo (public or private)
-2. Sets up `main` and `develop` branches, `develop` as default
-3. Generates files: `.gitattributes`, `.gitignore`, `README.md`, `LICENSE`, `GIT_REFERENCE.md`, PR template
-4. Injects user-provided templates (files or folders)
-5. Pushes everything to origin
-6. Applies rulesets (branch protection, merge rules, linear history)
-7. Adds collaborators
+2. Initializes the current directory as a git repo in place (no temp clone)
+3. Sets up `main` and `develop` branches, `develop` as default
+4. Generates files: `.gitattributes`, `.gitignore`, `README.md`, `LICENSE`, `GIT_REFERENCE.md`, PR template
+5. Injects user-provided templates (files or folders)
+6. Commits to `develop` and fast-forwards `main` so both branches start at the same SHA
+7. Applies rulesets (branch protection, merge rules, linear history)
+8. Adds collaborators
+9. Removes `sentinel.yml` from the working tree (it's runtime-only and gitignored)
 
 ### On `enforce`
 
