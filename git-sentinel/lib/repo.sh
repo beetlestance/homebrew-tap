@@ -2,6 +2,17 @@
 # repo.sh — repo creation and update
 # Requires: gh, git, log.sh, config.sh (sourced before this)
 
+# Update repo settings — non-fatal so a partial init doesn't strand the user.
+# Settings are re-attempted on every enforce run.
+update_repo_settings() {
+  if gh_api --method PATCH "/repos/$ORG/$REPO_NAME" \
+    -F delete_branch_on_merge="$DELETE_BRANCH_ON_MERGE" &>/dev/null; then
+    log_ok "repo settings updated: $ORG/$REPO_NAME"
+  else
+    log_warn "failed to update repo settings (will retry on next enforce)"
+  fi
+}
+
 create_repo() {
   # Fail if repo already exists
   if gh repo view "$ORG/$REPO_NAME" &>/dev/null; then
@@ -10,35 +21,36 @@ create_repo() {
     exit "$EXIT_GITHUB_ERROR"
   fi
 
-  local cmd=(gh repo create "$ORG/$REPO_NAME" "--$VISIBILITY" --description "$DESCRIPTION")
+  # Require cwd basename to match the configured repo name so we can init in place.
+  local cwd_name
+  cwd_name=$(basename "$PWD")
+  if [[ "$cwd_name" != "$REPO_NAME" ]]; then
+    log_fail "cwd '$cwd_name' does not match repo '$REPO_NAME'"
+    log_fail "create and cd into a directory named '$REPO_NAME', then re-run init"
+    exit "$EXIT_FS_ERROR"
+  fi
 
-  [[ -n "$LICENSE" ]] && cmd+=(--license "$LICENSE")
+  if [[ -d .git ]]; then
+    log_fail "directory is already a git repo: $PWD"
+    log_fail "remove .git/ or use 'git-sentinel enforce' instead"
+    exit "$EXIT_FS_ERROR"
+  fi
 
-  if ! "${cmd[@]}" &>/dev/null; then
+  # Create empty repo on GitHub. We deliberately do NOT pass --license: we
+  # generate LICENSE locally so the in-place push isn't blocked by an
+  # already-initialized remote.
+  if ! gh repo create "$ORG/$REPO_NAME" "--$VISIBILITY" --description "$DESCRIPTION" &>/dev/null; then
     log_fail "failed to create repo: $ORG/$REPO_NAME"
     exit "$EXIT_GITHUB_ERROR"
   fi
-
   log_ok "created repo: $ORG/$REPO_NAME ($VISIBILITY)"
 
-  # Set delete_branch_on_merge (-F for boolean/typed value)
-  if ! gh_api --method PATCH "/repos/$ORG/$REPO_NAME" \
-    -F delete_branch_on_merge="$DELETE_BRANCH_ON_MERGE" &>/dev/null; then
-    log_fail "failed to update repo settings: $ORG/$REPO_NAME"
-    exit "$EXIT_GITHUB_ERROR"
-  fi
+  update_repo_settings
 
-  log_ok "repo settings updated: $ORG/$REPO_NAME"
-
-  # Clone into temp directory to work in it
-  WORK_DIR=$(mktemp -d)
-  if ! gh repo clone "$ORG/$REPO_NAME" "$WORK_DIR" &>/dev/null; then
-    log_fail "failed to clone repo: $ORG/$REPO_NAME"
-    exit "$EXIT_GITHUB_ERROR"
-  fi
-
-  cd "$WORK_DIR" || exit "$EXIT_FS_ERROR"
-  log_ok "cloned repo into temp directory"
+  # Initialize git in place
+  git init -b main &>/dev/null
+  git remote add origin "https://github.com/$ORG/$REPO_NAME.git" &>/dev/null
+  log_ok "git initialized in place: $PWD"
 }
 
 update_repo() {
@@ -60,12 +72,5 @@ update_repo() {
     log_ok "cloned repo into temp directory"
   fi
 
-  # Set delete_branch_on_merge (-F for boolean/typed value)
-  if ! gh_api --method PATCH "/repos/$ORG/$REPO_NAME" \
-    -F delete_branch_on_merge="$DELETE_BRANCH_ON_MERGE" &>/dev/null; then
-    log_fail "failed to update repo settings: $ORG/$REPO_NAME"
-    exit "$EXIT_GITHUB_ERROR"
-  fi
-
-  log_ok "repo settings updated: $ORG/$REPO_NAME"
+  update_repo_settings
 }

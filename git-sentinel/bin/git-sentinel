@@ -22,7 +22,7 @@ trap 'rm -rf "${WORK_DIR:-}"' EXIT
 # ---------------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------------
-VERSION="git-sentinel v1.0.3"
+VERSION="git-sentinel v2.0.0"
 CONFIG_PATH="./sentinel.yml"
 COMMAND=""
 
@@ -84,23 +84,30 @@ cmd_init() {
   create_repo
   ensure_branches
 
-  # Generate files and push BEFORE rulesets lock the branch
+  # Generate files and templates BEFORE rulesets lock the branch
   generate_files
   inject_templates
+
+  # Conformance commit lands on the default branch (develop) first,
+  # then main is fast-forwarded to match. Both branches end at the same SHA.
+  git checkout develop --quiet
   git add -A
   git commit -m "Initialize repo with git-sentinel" --quiet
-  git push --quiet
-  log_ok "pushed to main"
-
-  # Sync develop with main so both branches have the generated files
-  git checkout develop --quiet
-  git merge main --quiet
   git push origin develop --quiet
-  log_ok "synced develop with main"
+  log_ok "pushed to develop (default)"
+
+  git branch -f main develop &>/dev/null
+  git push origin main --quiet
+  log_ok "synced main to develop"
 
   # Now lock it down
   apply_rulesets
   add_collaborators
+
+  # sentinel.yml is runtime-only — remove from working tree once init succeeds.
+  # It's gitignored so it was never staged.
+  rm -f "$CONFIG_PATH"
+  log_ok "removed $CONFIG_PATH (runtime-only)"
 
   log_ok "done — $ORG/$REPO_NAME is ready"
 }
@@ -119,16 +126,24 @@ cmd_enforce() {
   update_repo
   ensure_branches
 
-  # Generate files and push before updating rulesets
+  # Generate files and push before updating rulesets.
+  # Conformance commit lands on the default branch (develop), then main is
+  # fast-forwarded so both branches stay in sync.
   generate_files
   inject_templates
+
+  git checkout develop --quiet 2>/dev/null || git checkout -b develop --quiet
   git add -A
   if git diff --cached --quiet; then
     log_skip "no changes to commit"
   else
     git commit -m "Enforce config with git-sentinel" --quiet
-    git push --quiet
-    log_ok "pushed to origin"
+    git push origin develop --quiet
+    log_ok "pushed to develop (default)"
+
+    git branch -f main develop &>/dev/null
+    git push origin main --quiet
+    log_ok "synced main to develop"
   fi
 
   # Now update rulesets and collaborators
