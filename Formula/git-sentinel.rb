@@ -10,7 +10,8 @@ class GitSentinel < Formula
 
   def install
     bin.install "git-sentinel/bin/git-sentinel"
-    (lib/"git-sentinel").install Dir["git-sentinel/lib/*.sh"]
+    # Install all lib files (*.sh helpers + sentinel.example.yml schema source)
+    (lib/"git-sentinel").install Dir["git-sentinel/lib/*"]
     (share/"git-sentinel/templates").install Dir["git-sentinel/templates/*"]
   end
 
