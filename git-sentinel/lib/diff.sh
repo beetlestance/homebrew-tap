@@ -72,6 +72,54 @@ diff_normalize_ruleset() {
   ' "$1"
 }
 
+diff_ruleset_field_value() {
+  local file="$1"
+  local query="$2"
+  jq -c "$query" "$file"
+}
+
+diff_ruleset_field() {
+  local name="$1"
+  local field="$2"
+  local expected_file="$3"
+  local current_file="$4"
+  local query="$5"
+  local expected current
+
+  expected=$(diff_ruleset_field_value "$expected_file" "$query")
+  current=$(diff_ruleset_field_value "$current_file" "$query")
+
+  if [[ "$expected" != "$current" ]]; then
+    diff_drift "ruleset $name $field differs: expected $expected, got $current"
+  fi
+}
+
+diff_ruleset_details() {
+  local name="$1"
+  local expected_file="$2"
+  local current_file="$3"
+
+  diff_ruleset_field "$name" "enforcement" "$expected_file" "$current_file" '.enforcement // null'
+  diff_ruleset_field "$name" "target" "$expected_file" "$current_file" '.target // null'
+  diff_ruleset_field "$name" "branch refs" "$expected_file" "$current_file" \
+    '{include: (.conditions.ref_name.include // []), exclude: (.conditions.ref_name.exclude // [])}'
+  diff_ruleset_field "$name" "bypass actors" "$expected_file" "$current_file" \
+    '(.bypass_actors // []) | sort_by(.actor_type, .actor_id, .bypass_mode)'
+  diff_ruleset_field "$name" "rule types" "$expected_file" "$current_file" \
+    '(.rules // []) | map(.type) | sort'
+  diff_ruleset_field "$name" "required status checks" "$expected_file" "$current_file" \
+    '(.rules // [])
+      | map(select(.type == "required_status_checks"))
+      | map(.parameters.required_status_checks // [])
+      | flatten
+      | sort_by(.context, (.integration_id // 0))'
+  diff_ruleset_field "$name" "pull request policy" "$expected_file" "$current_file" \
+    '(.rules // [])
+      | map(select(.type == "pull_request"))
+      | map(.parameters)
+      | sort_by(.required_approving_review_count, .require_code_owner_review, .required_review_thread_resolution)'
+}
+
 diff_check_json_rulesets() {
   local remote_list ruleset_path name id expected_file current_file
   remote_list=$(gh_api "/repos/$ORG/$REPO_NAME/rulesets")
@@ -98,6 +146,7 @@ diff_check_json_rulesets() {
       diff_ok "ruleset matches: $name"
     else
       diff_drift "ruleset differs: $name"
+      diff_ruleset_details "$name" "$expected_file" "$current_file"
     fi
 
     rm -f "$expected_file" "$current_file"

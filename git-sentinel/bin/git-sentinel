@@ -29,12 +29,14 @@ DRY_RUN=false
 BULK_COMMAND=""
 BULK_ALL=false
 BULK_REPOS_FILE=""
+BULK_FORMAT="table"
 REPOS_COMMAND=""
 REPOS_OWNER_TYPE=""
 REPOS_OWNER=""
 REPOS_FORMAT="table"
 REPOS_VISIBILITY="all"
 REPOS_ARCHIVED="false"
+BULK_CONTINUE_ON_ERROR=false
 DOCTOR_REPO=""
 
 # ---------------------------------------------------------------------------
@@ -66,7 +68,7 @@ Repo discovery:
 Fleet operations:
   git-sentinel bulk plan --repos repos.txt
   git-sentinel bulk plan --all --org <org>
-  git-sentinel bulk enforce --repos repos.txt --config sentinel.yml
+  git-sentinel bulk enforce --repos repos.txt --config sentinel.yml [--format table|json]
 
 Doctor:
   git-sentinel doctor [--config sentinel.yml]
@@ -163,8 +165,16 @@ while [[ $# -gt 0 ]]; do
         log_fail "--format requires a value"
         exit 1
       fi
-      REPOS_FORMAT="$2"
+      if [[ "$COMMAND" == "bulk" ]]; then
+        BULK_FORMAT="$2"
+      else
+        REPOS_FORMAT="$2"
+      fi
       shift 2
+      ;;
+    --continue-on-error)
+      BULK_CONTINUE_ON_ERROR=true
+      shift
       ;;
     --visibility)
       if [[ $# -lt 2 ]]; then

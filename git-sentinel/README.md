@@ -95,7 +95,9 @@ git-sentinel diff --config sentinel.yml
 ```
 
 `diff` exits `0` when the repo matches the config and exits non-zero when drift
-is found.
+is found. For ruleset JSON payloads, it reports common drift categories such as
+enforcement, branch refs, bypass actors, rule types, required status checks, and
+pull request policy.
 
 Discover repositories before bulk planning or enforcement:
 
@@ -117,6 +119,8 @@ Apply fleet-wide enforcement:
 ```bash
 git-sentinel bulk enforce --repos repos.txt --config sentinel.yml
 git-sentinel bulk enforce --all --org example-org --config sentinel.yml
+git-sentinel bulk enforce --repos repos.txt --config sentinel.yml --continue-on-error
+git-sentinel bulk enforce --repos repos.txt --config sentinel.yml --format json
 ```
 
 Use `bulk enforce --dry-run` when you want the same selected-repo preview from
@@ -163,6 +167,10 @@ use `org:` from `sentinel.yml` or the owner passed to `--org/--user`.
 
 For bulk configs, `repo:` may be omitted because each target repo supplies its
 own name.
+
+By default, `bulk enforce` stops after the first failed repo and marks remaining
+repos as skipped in the summary. Use `--continue-on-error` to attempt every
+selected repo. Use `--format json` for a machine-readable final report.
 
 ## sentinel.yml Reference
 

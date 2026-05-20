@@ -15,6 +15,8 @@ Options:
   --visibility <all|public|private>
                               Filter discovered repos by visibility (default: all)
   --archived <all|true|false> Filter discovered repos by archived status (default: false)
+  --format <table|json>       Report format for bulk enforce (default: table)
+  --continue-on-error         Continue enforcing remaining repos after a failure
 EOF
 }
 
@@ -44,6 +46,11 @@ bulk_validate() {
 
   if [[ -n "$BULK_REPOS_FILE" && ! -f "$BULK_REPOS_FILE" ]]; then
     log_fail "repo list not found: $BULK_REPOS_FILE"
+    exit "$EXIT_CONFIG_ERROR"
+  fi
+
+  if [[ "$BULK_FORMAT" != "table" && "$BULK_FORMAT" != "json" ]]; then
+    log_fail "--format must be one of: table, json"
     exit "$EXIT_CONFIG_ERROR"
   fi
 }
@@ -118,6 +125,48 @@ bulk_target_owner_repo() {
   printf "%s\t%s\n" "$owner" "$repo"
 }
 
+bulk_report_init() {
+  BULK_REPORT='[]'
+}
+
+bulk_report_add() {
+  local repo="$1"
+  local status="$2"
+  local message="$3"
+
+  BULK_REPORT=$(echo "$BULK_REPORT" | jq \
+    --arg repo "$repo" \
+    --arg status "$status" \
+    --arg message "$message" \
+    '. + [{repo: $repo, status: $status, message: $message}]')
+}
+
+bulk_report_print() {
+  local total passed failed skipped
+
+  total=$(echo "$BULK_REPORT" | jq 'length')
+  passed=$(echo "$BULK_REPORT" | jq '[.[] | select(.status == "passed")] | length')
+  failed=$(echo "$BULK_REPORT" | jq '[.[] | select(.status == "failed")] | length')
+  skipped=$(echo "$BULK_REPORT" | jq '[.[] | select(.status == "skipped")] | length')
+
+  if [[ "$BULK_FORMAT" == "json" ]]; then
+    jq -n \
+      --argjson total "$total" \
+      --argjson passed "$passed" \
+      --argjson failed "$failed" \
+      --argjson skipped "$skipped" \
+      --argjson repos "$BULK_REPORT" \
+      '{summary: {total: $total, passed: $passed, failed: $failed, skipped: $skipped}, repos: $repos}'
+    return
+  fi
+
+  log_info "bulk summary: $passed passed, $failed failed, $skipped skipped, $total total"
+  echo "$BULK_REPORT" | jq -r '.[] | [.status, .repo, .message] | @tsv' \
+    | while IFS=$'\t' read -r status repo message; do
+      printf "  %-7s %-45s %s\n" "$status" "$repo" "$message"
+    done
+}
+
 bulk_enforce_one() {
   local target="$1"
   local target_owner target_repo original_org original_repo previous_dir repo_dir
@@ -133,6 +182,8 @@ bulk_enforce_one() {
   log_info "bulk enforce: $ORG/$REPO_NAME"
 
   repo_dir=$(mktemp -d)
+  trap 'rm -rf "$repo_dir"' EXIT
+
   if ! gh repo clone "$ORG/$REPO_NAME" "$repo_dir" &>/dev/null; then
     log_fail "failed to clone repo: $ORG/$REPO_NAME"
     ORG="$original_org"
@@ -162,7 +213,6 @@ bulk_enforce_one() {
   add_collaborators
 
   cd "$previous_dir" || return "$EXIT_FS_ERROR"
-  rm -rf "$repo_dir"
 
   ORG="$original_org"
   REPO_NAME="$original_repo"
@@ -176,7 +226,8 @@ bulk_enforce() {
   fi
   bulk_load_config
 
-  local repos count failed=0 target
+  local repos count failed=0 target full_name message
+  local target_owner target_repo skipped_target skipped_owner skipped_repo
   if [[ "$BULK_ALL" == true ]]; then
     repos=$(bulk_repos_from_discovery)
   else
@@ -191,12 +242,34 @@ bulk_enforce() {
     return
   fi
 
+  bulk_report_init
+
   while IFS= read -r target; do
-    if ! bulk_enforce_one "$target"; then
+    IFS=$'\t' read -r target_owner target_repo < <(bulk_target_owner_repo "$target")
+    full_name="$target_owner/$target_repo"
+
+    if ( bulk_enforce_one "$target" ); then
+      bulk_report_add "$full_name" "passed" "enforced"
+    else
+      message="enforce failed"
       log_fail "bulk enforce failed: $target"
+      bulk_report_add "$full_name" "failed" "$message"
       failed=$((failed + 1))
+
+      if [[ "$BULK_CONTINUE_ON_ERROR" != true ]]; then
+        while IFS= read -r skipped_target; do
+          [[ -n "$skipped_target" ]] || continue
+          IFS=$'\t' read -r skipped_owner skipped_repo < <(bulk_target_owner_repo "$skipped_target")
+          bulk_report_add "$skipped_owner/$skipped_repo" "skipped" "not attempted after failure"
+        done < <(echo "$repos" | jq -r --arg target "$target" '
+          (index($target) + 1) as $start | .[$start:][]?
+        ')
+        break
+      fi
     fi
   done < <(echo "$repos" | jq -r '.[]')
+
+  bulk_report_print
 
   if [[ "$failed" -gt 0 ]]; then
     log_fail "bulk enforce completed with $failed failure(s)"

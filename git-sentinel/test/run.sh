@@ -155,6 +155,103 @@ test_formula_rewrite_script() {
   rm -rf "$tmp_dir"
 }
 
+test_diff_ruleset_details() {
+  local tmp_dir expected current output
+  tmp_dir=$(mktemp -d)
+  expected="$tmp_dir/expected.json"
+  current="$tmp_dir/current.json"
+  output="$tmp_dir/diff.out"
+
+  cat > "$expected" <<'JSON'
+{
+  "name": "protect-main",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": ["refs/heads/main"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "required_status_checks": [{"context": "ci/test", "integration_id": null}]
+      }
+    }
+  ],
+  "bypass_actors": [{"actor_id": 1, "actor_type": "User", "bypass_mode": "pull_request"}]
+}
+JSON
+
+  cat > "$current" <<'JSON'
+{
+  "name": "protect-main",
+  "target": "branch",
+  "enforcement": "evaluate",
+  "conditions": {
+    "ref_name": {
+      "include": ["refs/heads/stable"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "required_status_checks": [{"context": "ci/lint", "integration_id": null}]
+      }
+    }
+  ],
+  "bypass_actors": [{"actor_id": 2, "actor_type": "Team", "bypass_mode": "always"}]
+}
+JSON
+
+  (
+    # shellcheck source=/dev/null
+    source "$ROOT_DIR/lib/log.sh"
+    # shellcheck source=/dev/null
+    source "$ROOT_DIR/lib/diff.sh"
+    diff_ruleset_details "protect-main" "$expected" "$current"
+  ) >"$output" 2>&1
+
+  assert_contains "$output" "ruleset protect-main enforcement differs" "diff reports ruleset enforcement drift"
+  assert_contains "$output" "ruleset protect-main branch refs differs" "diff reports ruleset branch drift"
+  assert_contains "$output" "ruleset protect-main bypass actors differs" "diff reports ruleset bypass drift"
+  assert_contains "$output" "ruleset protect-main required status checks differs" "diff reports status check drift"
+
+  rm -rf "$tmp_dir"
+}
+
+test_bulk_json_report() {
+  local tmp_dir output
+  tmp_dir=$(mktemp -d)
+  output="$tmp_dir/report.json"
+
+  (
+    BULK_FORMAT="json"
+    # shellcheck source=/dev/null
+    source "$ROOT_DIR/lib/log.sh"
+    # shellcheck source=/dev/null
+    source "$ROOT_DIR/lib/bulk.sh"
+
+    bulk_report_init
+    bulk_report_add "example-org/one" "passed" "enforced"
+    bulk_report_add "example-org/two" "failed" "enforce failed"
+    bulk_report_add "example-org/three" "skipped" "not attempted after failure"
+    bulk_report_print
+  ) > "$output"
+
+  jq -e '
+    .summary == {total: 3, passed: 1, failed: 1, skipped: 1}
+    and (.repos | length == 3)
+  ' "$output" >/dev/null
+  pass "bulk json report"
+
+  rm -rf "$tmp_dir"
+}
+
 main() {
   test_shell_syntax
   test_ruleset_fixtures
@@ -162,6 +259,8 @@ main() {
   test_bulk_dry_run_without_repo_field
   test_generated_files
   test_formula_rewrite_script
+  test_diff_ruleset_details
+  test_bulk_json_report
   pass "all tests passed"
 }
 
