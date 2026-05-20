@@ -147,6 +147,13 @@ test_formula_rewrite_script() {
   assert_contains "$formula" '  version "9.8.7"' "formula rewrite updates version"
   assert_contains "$formula" '  head "https://github.com/beetlestance/homebrew-tap.git", branch: "develop"' "formula rewrite preserves head"
 
+  "$FORMULA_SCRIPT" \
+    --formula "$formula" \
+    --url "https://example.com/git-sentinel-v9.8.7.tar.gz" \
+    --sha256 "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" \
+    --version "9.8.7" >/dev/null
+  pass "formula rewrite is idempotent"
+
   rm -rf "$tmp_dir"
 }
 

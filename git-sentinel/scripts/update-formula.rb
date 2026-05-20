@@ -26,14 +26,19 @@ formula_path = options[:formula]
 formula = File.read(formula_path)
 stable_block = %(  url "#{options[:url]}"\n  sha256 "#{options[:sha256]}"\n  version "#{options[:version]}"\n)
 
+if formula.include?(stable_block)
+  puts "Formula already points at #{options[:version]}"
+  exit 0
+end
+
 updated =
-  if formula.match?(/^  url "/)
+  if formula.match?(/^  url ".*"\n  sha256 ".*"\n  version ".*"\n/)
     formula.sub(/^  url ".*"\n  sha256 ".*"\n  version ".*"\n/, stable_block)
-  else
+  elsif formula.match?(/^  head /)
     formula.sub(/^  head /, "#{stable_block}  head ")
   end
 
-if updated == formula
+if updated.nil? || updated == formula
   warn "Formula was not updated; expected a stable block or head line in #{formula_path}"
   exit 1
 end
