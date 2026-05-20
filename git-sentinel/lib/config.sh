@@ -16,6 +16,21 @@ parse_config() {
   DELETE_BRANCH_ON_MERGE=$(yq '.delete_branch_on_merge // true' "$CONFIG_PATH")
   REQUIRE_CODE_OWNER_REVIEW=$(yq '.require_code_owner_review // false' "$CONFIG_PATH")
 
+  BYPASS_USERS=()
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && BYPASS_USERS+=("$line")
+  done < <(yq '.bypass_actors.users[]' "$CONFIG_PATH" 2>/dev/null)
+
+  BYPASS_TEAMS=()
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && BYPASS_TEAMS+=("$line")
+  done < <(yq '.bypass_actors.teams[]' "$CONFIG_PATH" 2>/dev/null)
+
+  BYPASS_APPS=()
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && BYPASS_APPS+=("$line")
+  done < <(yq '.bypass_actors.apps[]' "$CONFIG_PATH" 2>/dev/null)
+
   COLLABORATORS=()
   while IFS= read -r line; do
     [[ -n "$line" ]] && COLLABORATORS+=("$line")

@@ -147,6 +147,15 @@ license: gpl-3.0                   # any SPDX key GitHub supports (omit to skip)
 collaborators:
   - kamesh
 
+# Ruleset bypass actors (optional)
+bypass_actors:
+  users:
+    - release-admin
+  teams:
+    - repo-admins
+  apps:
+    - release-backmerge-app
+
 # Templates — files or folders to inject into the repo
 templates:
   - ./CLAUDE.md

@@ -26,13 +26,23 @@ plan_files() {
     readme_source="README.md generated from repo name and description"
   fi
 
-  plan_list_items "files to generate or update" \
-    ".gitattributes" \
-    ".gitignore" \
-    "$readme_source" \
-    "LICENSE${LICENSE:+ from GitHub license key '$LICENSE'}" \
-    "GIT_REFERENCE.md" \
+  local files=(
+    ".gitattributes"
+    ".gitignore"
+    "$readme_source"
+  )
+
+  if [[ -n "$LICENSE" ]]; then
+    files+=("LICENSE from GitHub license key '$LICENSE'")
+  fi
+
+  files+=(
+    "GIT_REFERENCE.md"
     ".github/PULL_REQUEST_TEMPLATE.md"
+  )
+
+  plan_list_items "files to generate or update" \
+    "${files[@]}"
 
   plan_list_items "templates to inject" "${TEMPLATES[@]}"
 }
@@ -41,6 +51,9 @@ plan_rulesets() {
   plan_list_items "rulesets to apply" \
     "protect-main: PR required, $REQUIRED_REVIEWS approving review(s), code owner review: $REQUIRE_CODE_OWNER_REVIEW, merge/rebase allowed, linear history" \
     "protect-develop: PR required, 0 approving reviews, squash merge only, linear history"
+  plan_list_items "bypass users" "${BYPASS_USERS[@]}"
+  plan_list_items "bypass teams" "${BYPASS_TEAMS[@]}"
+  plan_list_items "bypass apps" "${BYPASS_APPS[@]}"
 }
 
 plan_init() {

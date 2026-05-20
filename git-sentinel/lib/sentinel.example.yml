@@ -43,6 +43,17 @@ license: gpl-3.0
 collaborators:
   - kamesh
 
+# Explicit ruleset bypass actors (optional)
+# If omitted, git-sentinel falls back to the authenticated user for compatibility.
+# Team values are GitHub team slugs. App values are GitHub App slugs.
+bypass_actors:
+  users:
+    - release-admin
+  teams:
+    - repo-admins
+  apps:
+    - release-backmerge-app
+
 # Templates to inject into the repo (optional)
 # Accepts file paths and/or folder paths — folder contents are copied preserving structure
 templates:

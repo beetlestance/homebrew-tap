@@ -4,6 +4,53 @@
 # Expects: ORG, REPO_NAME, REQUIRED_REVIEWS, REQUIRE_CODE_OWNER_REVIEW,
 #          REQUIRE_STATUS_CHECKS set by config.sh
 
+resolve_bypass_actors() {
+  local actors="[]"
+  local user user_id team team_id app app_id
+
+  for user in "${BYPASS_USERS[@]}"; do
+    user_id=$(gh_api "/users/$user" --jq '.id' 2>/dev/null) || {
+      log_fail "failed to resolve bypass user: $user"
+      return "$EXIT_GITHUB_ERROR"
+    }
+    actors=$(echo "$actors" | jq \
+      --argjson id "$user_id" \
+      '. + [{ actor_id: $id, actor_type: "User", bypass_mode: "always" }]')
+  done
+
+  for team in "${BYPASS_TEAMS[@]}"; do
+    team_id=$(gh_api "/orgs/$ORG/teams/$team" --jq '.id' 2>/dev/null) || {
+      log_fail "failed to resolve bypass team: $team"
+      return "$EXIT_GITHUB_ERROR"
+    }
+    actors=$(echo "$actors" | jq \
+      --argjson id "$team_id" \
+      '. + [{ actor_id: $id, actor_type: "Team", bypass_mode: "always" }]')
+  done
+
+  for app in "${BYPASS_APPS[@]}"; do
+    app_id=$(gh_api "/apps/$app" --jq '.id' 2>/dev/null) || {
+      log_fail "failed to resolve bypass app: $app"
+      return "$EXIT_GITHUB_ERROR"
+    }
+    actors=$(echo "$actors" | jq \
+      --argjson id "$app_id" \
+      '. + [{ actor_id: $id, actor_type: "Integration", bypass_mode: "always" }]')
+  done
+
+  if [[ "$actors" == "[]" ]]; then
+    local user_id
+    user_id=$(gh_api "/user" --jq '.id' 2>/dev/null) || user_id=""
+    if [[ -n "$user_id" ]]; then
+      actors=$(jq -n --argjson id "$user_id" \
+        '[{ actor_id: $id, actor_type: "User", bypass_mode: "always" }]')
+      log_warn "no bypass_actors configured; defaulting bypass actor to current user"
+    fi
+  fi
+
+  echo "$actors"
+}
+
 create_or_update_ruleset() {
   local name="$1"
   local branch_pattern="$2"
@@ -16,9 +63,8 @@ create_or_update_ruleset() {
     dismiss_stale="false"
   fi
 
-  # Get current user's ID for bypass actor
-  local user_id
-  user_id=$(gh_api "/user" --jq '.id' 2>/dev/null) || user_id=""
+  local bypass_actors
+  bypass_actors=$(resolve_bypass_actors)
 
   local payload
   payload=$(jq -n \
@@ -27,7 +73,7 @@ create_or_update_ruleset() {
     --argjson reviews "$required_reviews" \
     --argjson dismiss "$dismiss_stale" \
     --argjson code_owner "$code_owner_review" \
-    --argjson user_id "${user_id:-0}" \
+    --argjson bypass_actors "$bypass_actors" \
     --argjson merge_methods "$merge_methods" \
     '{
       name: $name,
@@ -47,9 +93,7 @@ create_or_update_ruleset() {
         }},
         { type: "required_linear_history" }
       ],
-      bypass_actors: [
-        { actor_id: $user_id, actor_type: "User", bypass_mode: "always" }
-      ]
+      bypass_actors: $bypass_actors
     }')
 
   # The rulesets API normally returns an array, but on errors or unexpected
