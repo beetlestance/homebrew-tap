@@ -1,9 +1,9 @@
 class GitSentinel < Formula
   desc "GitHub repository ruleset enforcer"
   homepage "https://github.com/beetlestance/homebrew-tap"
-  url "https://github.com/beetlestance/homebrew-tap/archive/refs/tags/git-sentinel-v3.0.0.tar.gz"
-  sha256 "598517bf0480d61a29656bb0ac3deef3a1e0b5e1d35fb8cae421612ece1c769d"
-  version "3.0.0"
+  url "https://github.com/beetlestance/homebrew-tap/releases/download/git-sentinel-v3.0.1/git-sentinel-3.0.1.tar.gz"
+  sha256 "2dc475855404a545805b8d42ae0b9907e80abd9f67944d7e7fbdfa4cd8e69cbc"
+  version "3.0.1"
   head "https://github.com/beetlestance/homebrew-tap.git", branch: "develop"
   license "GPL-3.0"
 
