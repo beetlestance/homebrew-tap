@@ -122,7 +122,10 @@ diff_ruleset_details() {
 
 diff_check_json_rulesets() {
   local remote_list ruleset_path name id expected_file current_file
-  remote_list=$(gh_api "/repos/$ORG/$REPO_NAME/rulesets")
+  remote_list=$(gh_api "/repos/$ORG/$REPO_NAME/rulesets" 2>/dev/null) || {
+    log_skip "rulesets diff ($(rulesets_api_error_message "$(gh_api "/repos/$ORG/$REPO_NAME/rulesets" 2>&1 >/dev/null || true)"))"
+    return
+  }
 
   for ruleset_path in ${RULESET_PATHS[@]+"${RULESET_PATHS[@]}"}; do
     name=$(jq -r '.name' "$ruleset_path")
@@ -155,7 +158,10 @@ diff_check_json_rulesets() {
 
 diff_check_generated_rulesets() {
   local remote_list branch name
-  remote_list=$(gh_api "/repos/$ORG/$REPO_NAME/rulesets")
+  remote_list=$(gh_api "/repos/$ORG/$REPO_NAME/rulesets" 2>/dev/null) || {
+    log_skip "rulesets diff ($(rulesets_api_error_message "$(gh_api "/repos/$ORG/$REPO_NAME/rulesets" 2>&1 >/dev/null || true)"))"
+    return
+  }
 
   for branch in ${BRANCHES[@]+"${BRANCHES[@]}"}; do
     name="protect-$branch"
