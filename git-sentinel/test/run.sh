@@ -84,51 +84,20 @@ test_macos_bash_dry_run() {
 }
 
 test_bulk_dry_run_without_repo_field() {
-  local tmp_dir config repos output
-  tmp_dir=$(mktemp -d)
-  config="$tmp_dir/sentinel.yml"
-  repos="$tmp_dir/repos.txt"
-  output="$tmp_dir/bulk.out"
-
-  cat > "$config" <<'YAML'
-org: example-org
-visibility: private
-description: "Bulk policy template"
-branches:
-  - stable
-  - trunk
-default_branch: trunk
-delete_branch_on_merge: true
-YAML
-
-  cat > "$repos" <<'EOF'
-example-org/service-one
-service-two
-EOF
+  local config repos output
+  config="$ROOT_DIR/test/fixtures/bulk/sentinel.yml"
+  repos="$ROOT_DIR/test/fixtures/bulk/repos.txt"
+  output="/tmp/git-sentinel-bulk-dry-run.out"
 
   "$BIN" bulk enforce --dry-run --repos "$repos" --config "$config" > "$output"
   assert_contains "$output" "config validated: example-org/<bulk-target>" "bulk config may omit repo"
   assert_contains "$output" "bulk dry run: 2 repo(s) selected" "bulk dry-run selects repos"
-
-  rm -rf "$tmp_dir"
 }
 
 test_generated_files() {
   local tmp_dir config
   tmp_dir=$(mktemp -d)
-  config="$tmp_dir/sentinel.yml"
-
-  cat > "$config" <<'YAML'
-org: example-org
-repo: generated-fixture
-visibility: private
-description: "Generated file fixture"
-branches:
-  - stable
-  - trunk
-default_branch: trunk
-delete_branch_on_merge: true
-YAML
+  config="$ROOT_DIR/test/fixtures/generated-files/sentinel.yml"
 
   (
     SCRIPT_DIR="$ROOT_DIR/bin"
