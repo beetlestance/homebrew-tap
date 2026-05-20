@@ -47,6 +47,7 @@ Usage: git-sentinel <command> [options]
 Commands:
   init      Create a new repo from sentinel.yml
   enforce   Apply/update rulesets and files on existing repo
+  diff      Compare current repo state against sentinel.yml
   bulk     Plan fleet-wide operations across multiple repos
   doctor   Check local tools, GitHub auth, and repo access
   repos     Discover repositories under an org or personal account
@@ -77,7 +78,7 @@ EOF
 # ---------------------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    init|enforce|schema|help|version|doctor)
+    init|enforce|diff|schema|help|version|doctor)
       COMMAND="$1"
       shift
       ;;
@@ -290,6 +291,7 @@ cmd_enforce() {
 case "${COMMAND}" in
   init)    cmd_init ;;
   enforce) cmd_enforce ;;
+  diff)    sentinel_diff ;;
   bulk)
     case "$BULK_COMMAND" in
       plan) bulk_plan ;;

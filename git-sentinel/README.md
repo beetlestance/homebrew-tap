@@ -50,6 +50,9 @@ git-sentinel init
 
 # Or, on an existing repo: cd in and update
 git-sentinel enforce
+
+# See whether an existing repo has drifted from the config
+git-sentinel diff --config sentinel.yml
 ```
 
 > `git-sentinel init` initializes the **current directory** as the working tree
@@ -62,6 +65,7 @@ git-sentinel enforce
 |---|---|
 | `init` | Create a new repo from `sentinel.yml` |
 | `enforce` | Apply/update rulesets and files on existing repo |
+| `diff` | Compare current GitHub repo state against `sentinel.yml` |
 | `bulk plan` | Preview fleet-wide enforcement across multiple repos |
 | `doctor` | Check local tools, GitHub auth, and repo access |
 | `repos list` | List repositories under an org or personal account |
@@ -82,6 +86,15 @@ Preview an operation before changing GitHub or the working tree:
 git-sentinel init --dry-run
 git-sentinel enforce --dry-run
 ```
+
+Check for drift before enforcing:
+
+```bash
+git-sentinel diff --config sentinel.yml
+```
+
+`diff` exits `0` when the repo matches the config and exits non-zero when drift
+is found.
 
 Discover repositories before bulk planning or enforcement:
 
@@ -124,6 +137,12 @@ git-sentinel doctor --org example-org --repo example-repo
 ### On `enforce`
 
 Same as init but on an existing repo — updates rulesets, regenerates files, injects templates.
+
+### On `diff`
+
+Compares the current GitHub repo against `sentinel.yml` without applying
+changes. It checks repo settings, configured branches, default branch, rulesets,
+generated/template files on the default branch, and configured collaborators.
 
 ## sentinel.yml Reference
 
@@ -260,6 +279,7 @@ git-sentinel/
 │   ├── repo.sh               # Repo creation and update
 │   ├── branches.sh           # Branch management
 │   ├── rulesets.sh            # GitHub Rulesets API
+│   ├── diff.sh                # Drift detection
 │   ├── files.sh              # File generation
 │   ├── templates.sh           # Template injection
 │   ├── schema.sh             # Schema output

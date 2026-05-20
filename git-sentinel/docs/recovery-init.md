@@ -6,8 +6,12 @@ but exits before finishing.
 `init` is designed so most failed runs can be resumed with:
 
 ```bash
+git-sentinel diff --config sentinel.yml
 git-sentinel enforce --config sentinel.yml
 ```
+
+Use `diff` first when you want to inspect what is missing or out of policy
+before applying the repair.
 
 If `sentinel.yml` was removed after a successful init, the repo is already past
 the recovery point. Use a fresh config only when you intentionally want to
