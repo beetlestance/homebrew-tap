@@ -30,10 +30,24 @@ create_repo() {
     exit "$EXIT_FS_ERROR"
   fi
 
+  local expected_origin="https://github.com/$ORG/$REPO_NAME.git"
+  local existing_origin=""
+  local reuse_existing_git=false
+
   if [[ -d .git ]]; then
-    log_fail "directory is already a git repo: $PWD"
-    log_fail "remove .git/ or use 'git-sentinel enforce' instead"
-    exit "$EXIT_FS_ERROR"
+    existing_origin=$(git remote get-url origin 2>/dev/null || true)
+
+    if [[ "$existing_origin" == "$expected_origin" ]]; then
+      reuse_existing_git=true
+      log_skip "git repo already initialized with matching origin"
+    else
+      log_fail "directory is already a git repo: $PWD"
+      if [[ -n "$existing_origin" ]]; then
+        log_fail "origin is '$existing_origin', expected '$expected_origin'"
+      fi
+      log_fail "remove .git/ or use a directory for '$REPO_NAME', then re-run init"
+      exit "$EXIT_FS_ERROR"
+    fi
   fi
 
   # Create empty repo on GitHub. We deliberately do NOT pass --license: we
@@ -47,10 +61,13 @@ create_repo() {
 
   update_repo_settings
 
-  # Initialize git in place
-  git init -b "$DEFAULT_BRANCH" &>/dev/null
-  git remote add origin "https://github.com/$ORG/$REPO_NAME.git" &>/dev/null
-  log_ok "git initialized in place: $PWD"
+  if [[ "$reuse_existing_git" == true ]]; then
+    log_ok "git initialized in place: $PWD"
+  else
+    git init -b "$DEFAULT_BRANCH" &>/dev/null
+    git remote add origin "$expected_origin" &>/dev/null
+    log_ok "git initialized in place: $PWD"
+  fi
 }
 
 update_repo() {
