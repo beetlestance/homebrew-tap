@@ -1,0 +1,11 @@
+org: example-org
+repo: macos-bash-fixture
+visibility: private
+description: "macOS bash fixture"
+branches:
+  - main
+  - develop
+default_branch: develop
+delete_branch_on_merge: true
+rulesets:
+  - ./rulesets/protect-main.json

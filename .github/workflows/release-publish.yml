@@ -49,13 +49,71 @@ jobs:
             exit 1
           fi
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.title }}
-          generate_release_notes: true
-          make_latest: true
+      - name: Generate release notes
+        id: release-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          NOTES_FILE="$RUNNER_TEMP/release-notes.md"
+          GENERATED_FILE="$RUNNER_TEMP/generated-release-notes.md"
+          CHANGELOG_FILE="git-sentinel/CHANGELOG.md"
+
+          gh api "repos/${{ github.repository }}/releases/generate-notes" \
+            -f tag_name="$TAG" \
+            -f target_commitish="$TAG" \
+            --jq '.body' > "$GENERATED_FILE"
+
+          if [[ -f "$CHANGELOG_FILE" ]]; then
+            awk -v version="$VERSION" '
+              BEGIN { heading = "## git-sentinel v" version }
+              /^## / {
+                if (found) exit
+                if ($0 == heading || index($0, heading " - ") == 1) {
+                  found = 1
+                  next
+                }
+              }
+              found { print }
+            ' "$CHANGELOG_FILE" > "$NOTES_FILE"
+          fi
+
+          if [[ ! -s "$NOTES_FILE" ]]; then
+            cp "$GENERATED_FILE" "$NOTES_FILE"
+          else
+            {
+              printf "\n"
+              grep -E '^\*\*Full Changelog\*\*:' "$GENERATED_FILE" || true
+            } >> "$NOTES_FILE"
+          fi
+
+          echo "file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          TITLE: ${{ steps.version.outputs.title }}
+          NOTES_FILE: ${{ steps.release-notes.outputs.file }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" \
+              --title "$TITLE" \
+              --notes-file "$NOTES_FILE" \
+              --latest \
+              --draft=false
+          else
+            gh release create "$TAG" \
+              --verify-tag \
+              --title "$TITLE" \
+              --notes-file "$NOTES_FILE" \
+              --latest
+          fi
 
       - name: Generate backmerge token
         id: backmerge-token

@@ -91,23 +91,10 @@ jobs:
 
       - name: Update Homebrew formula
         run: |
-          ruby <<'RUBY'
-          formula_path = "Formula/git-sentinel.rb"
-          url = "${{ steps.archive.outputs.url }}"
-          sha256 = "${{ steps.archive.outputs.sha256 }}"
-          version = "${{ steps.version.outputs.version }}"
-
-          formula = File.read(formula_path)
-          stable_block = %(  url "#{url}"\n  sha256 "#{sha256}"\n  version "#{version}"\n)
-
-          if formula.match?(/^  url "/)
-            formula = formula.sub(/^  url ".*"\n  sha256 ".*"\n  version ".*"\n/, stable_block)
-          else
-            formula = formula.sub(/^  head /, "#{stable_block}  head ")
-          end
-
-          File.write(formula_path, formula)
-          RUBY
+          git-sentinel/scripts/update-formula.rb \
+            --url "${{ steps.archive.outputs.url }}" \
+            --sha256 "${{ steps.archive.outputs.sha256 }}" \
+            --version "${{ steps.version.outputs.version }}"
 
       - name: Commit formula update
         run: |

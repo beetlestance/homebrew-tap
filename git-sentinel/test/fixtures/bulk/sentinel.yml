@@ -1,0 +1,8 @@
+org: example-org
+visibility: private
+description: "Bulk policy template"
+branches:
+  - stable
+  - trunk
+default_branch: trunk
+delete_branch_on_merge: true

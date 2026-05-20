@@ -3,8 +3,46 @@
 # Requires: yq, log.sh (sourced before this)
 # Expects: CONFIG_PATH set by caller
 
+ORG="${ORG:-}"
+REPO_NAME="${REPO_NAME:-}"
+VISIBILITY="${VISIBILITY:-private}"
+DESCRIPTION="${DESCRIPTION:-}"
+REQUIRED_REVIEWS="${REQUIRED_REVIEWS:-0}"
+README_PATH="${README_PATH:-}"
+LICENSE="${LICENSE:-}"
+DELETE_BRANCH_ON_MERGE="${DELETE_BRANCH_ON_MERGE:-true}"
+REQUIRE_CODE_OWNER_REVIEW="${REQUIRE_CODE_OWNER_REVIEW:-false}"
+DEFAULT_BRANCH="${DEFAULT_BRANCH:-develop}"
+
+declare -p BRANCHES >/dev/null 2>&1 || BRANCHES=("main" "develop")
+declare -p BYPASS_USERS >/dev/null 2>&1 || BYPASS_USERS=()
+declare -p BYPASS_TEAMS >/dev/null 2>&1 || BYPASS_TEAMS=()
+declare -p BYPASS_APPS >/dev/null 2>&1 || BYPASS_APPS=()
+declare -p COLLABORATORS >/dev/null 2>&1 || COLLABORATORS=()
+declare -p TEMPLATES >/dev/null 2>&1 || TEMPLATES=()
+declare -p RULESET_PATHS >/dev/null 2>&1 || RULESET_PATHS=()
+
+resolve_config_path() {
+  local path="$1"
+  local base_dir="$2"
+
+  case "$path" in
+    /*) ;;
+    *) path="$base_dir/$path" ;;
+  esac
+
+  if [[ -d "$path" ]]; then
+    cd "$path" && pwd
+  else
+    echo "$(cd "$(dirname "$path")" && pwd)/$(basename "$path")"
+  fi
+}
+
 parse_config() {
   [[ -f "$CONFIG_PATH" ]] || { log_fail "config not found: $CONFIG_PATH"; exit "$EXIT_CONFIG_ERROR"; }
+
+  local config_dir
+  config_dir=$(cd "$(dirname "$CONFIG_PATH")" && pwd)
 
   ORG=$(yq '.org // ""' "$CONFIG_PATH")
   REPO_NAME=$(yq '.repo // ""' "$CONFIG_PATH")
@@ -15,6 +53,30 @@ parse_config() {
   LICENSE=$(yq '.license // ""' "$CONFIG_PATH")
   DELETE_BRANCH_ON_MERGE=$(yq '.delete_branch_on_merge // true' "$CONFIG_PATH")
   REQUIRE_CODE_OWNER_REVIEW=$(yq '.require_code_owner_review // false' "$CONFIG_PATH")
+  DEFAULT_BRANCH=$(yq '.default_branch // "develop"' "$CONFIG_PATH")
+
+  BRANCHES=()
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && BRANCHES+=("$line")
+  done < <(yq '.branches[]' "$CONFIG_PATH" 2>/dev/null)
+  if [[ "${#BRANCHES[@]}" -eq 0 ]]; then
+    BRANCHES=("main" "develop")
+  fi
+
+  BYPASS_USERS=()
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && BYPASS_USERS+=("$line")
+  done < <(yq '.bypass_actors.users[]' "$CONFIG_PATH" 2>/dev/null)
+
+  BYPASS_TEAMS=()
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && BYPASS_TEAMS+=("$line")
+  done < <(yq '.bypass_actors.teams[]' "$CONFIG_PATH" 2>/dev/null)
+
+  BYPASS_APPS=()
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && BYPASS_APPS+=("$line")
+  done < <(yq '.bypass_actors.apps[]' "$CONFIG_PATH" 2>/dev/null)
 
   COLLABORATORS=()
   while IFS= read -r line; do
@@ -26,28 +88,55 @@ parse_config() {
     [[ -n "$line" ]] && TEMPLATES+=("$line")
   done < <(yq '.templates[]' "$CONFIG_PATH" 2>/dev/null)
 
+  RULESET_PATHS=()
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && RULESET_PATHS+=("$line")
+  done < <(yq '.rulesets[]' "$CONFIG_PATH" 2>/dev/null)
+
   # Resolve relative paths to absolute so they survive cd into work directories
   if [[ -n "$README_PATH" ]]; then
-    README_PATH=$(cd "$(dirname "$README_PATH")" && pwd)/$(basename "$README_PATH")
+    README_PATH=$(resolve_config_path "$README_PATH" "$config_dir")
   fi
 
   local resolved=()
-  for tmpl in "${TEMPLATES[@]}"; do
-    if [[ -d "$tmpl" ]]; then
-      resolved+=("$(cd "$tmpl" && pwd)")
-    else
-      resolved+=("$(cd "$(dirname "$tmpl")" && pwd)/$(basename "$tmpl")")
-    fi
+  for tmpl in ${TEMPLATES[@]+"${TEMPLATES[@]}"}; do
+    resolved+=("$(resolve_config_path "$tmpl" "$config_dir")")
   done
-  TEMPLATES=("${resolved[@]}")
+  TEMPLATES=(${resolved[@]+"${resolved[@]}"})
+
+  resolved=()
+  for ruleset in ${RULESET_PATHS[@]+"${RULESET_PATHS[@]}"}; do
+    resolved+=("$(resolve_config_path "$ruleset" "$config_dir")")
+  done
+  RULESET_PATHS=(${resolved[@]+"${resolved[@]}"})
 }
 
 validate_config() {
   [[ -n "$ORG" ]] || { log_fail "org is required in $CONFIG_PATH"; exit "$EXIT_CONFIG_ERROR"; }
-  [[ -n "$REPO_NAME" ]] || { log_fail "repo is required in $CONFIG_PATH"; exit "$EXIT_CONFIG_ERROR"; }
+  if [[ -z "$REPO_NAME" && "${ALLOW_EMPTY_REPO:-false}" != true ]]; then
+    log_fail "repo is required in $CONFIG_PATH"
+    exit "$EXIT_CONFIG_ERROR"
+  fi
 
   if [[ "$VISIBILITY" != "public" && "$VISIBILITY" != "private" ]]; then
     log_fail "visibility must be 'public' or 'private', got '$VISIBILITY'"
+    exit "$EXIT_CONFIG_ERROR"
+  fi
+
+  local branch default_found=false
+  for branch in ${BRANCHES[@]+"${BRANCHES[@]}"}; do
+    if [[ "$branch" =~ [[:space:]] || "$branch" == refs/* || "$branch" == "" ]]; then
+      log_fail "invalid branch name in $CONFIG_PATH: $branch"
+      exit "$EXIT_CONFIG_ERROR"
+    fi
+
+    if [[ "$branch" == "$DEFAULT_BRANCH" ]]; then
+      default_found=true
+    fi
+  done
+
+  if [[ "$default_found" != true ]]; then
+    log_fail "default_branch must be included in branches: $DEFAULT_BRANCH"
     exit "$EXIT_CONFIG_ERROR"
   fi
 
@@ -56,12 +145,29 @@ validate_config() {
     exit "$EXIT_CONFIG_ERROR"
   fi
 
-  for tmpl in "${TEMPLATES[@]}"; do
+  for tmpl in ${TEMPLATES[@]+"${TEMPLATES[@]}"}; do
     if [[ ! -f "$tmpl" && ! -d "$tmpl" ]]; then
       log_fail "template path does not exist: $tmpl"
       exit "$EXIT_CONFIG_ERROR"
     fi
   done
 
-  log_ok "config validated: $ORG/$REPO_NAME"
+  for ruleset in ${RULESET_PATHS[@]+"${RULESET_PATHS[@]}"}; do
+    if [[ ! -f "$ruleset" ]]; then
+      log_fail "ruleset path does not exist: $ruleset"
+      exit "$EXIT_CONFIG_ERROR"
+    fi
+
+    if ! jq empty "$ruleset" >/dev/null 2>&1; then
+      log_fail "ruleset is not valid JSON: $ruleset"
+      exit "$EXIT_CONFIG_ERROR"
+    fi
+
+    if [[ "$(jq -r '.name // ""' "$ruleset")" == "" ]]; then
+      log_fail "ruleset JSON must include a name: $ruleset"
+      exit "$EXIT_CONFIG_ERROR"
+    fi
+  done
+
+  log_ok "config validated: $ORG/${REPO_NAME:-<bulk-target>}"
 }

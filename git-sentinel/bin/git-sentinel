@@ -25,23 +25,54 @@ trap 'rm -rf "${WORK_DIR:-}"' EXIT
 VERSION="git-sentinel v2.0.1"
 CONFIG_PATH="./sentinel.yml"
 COMMAND=""
+DRY_RUN=false
+BULK_COMMAND=""
+BULK_ALL=false
+BULK_REPOS_FILE=""
+BULK_FORMAT="table"
+REPOS_COMMAND=""
+REPOS_OWNER_TYPE=""
+REPOS_OWNER=""
+REPOS_FORMAT="table"
+REPOS_VISIBILITY="all"
+REPOS_ARCHIVED="false"
+BULK_CONTINUE_ON_ERROR=false
+DOCTOR_REPO=""
 
 # ---------------------------------------------------------------------------
 # Usage
 # ---------------------------------------------------------------------------
 usage() {
   cat <<EOF
-Usage: git-sentinel <command> [--config <path>]
+Usage: git-sentinel <command> [options]
 
 Commands:
   init      Create a new repo from sentinel.yml
   enforce   Apply/update rulesets and files on existing repo
+  diff      Compare current repo state against sentinel.yml
+  bulk     Plan or enforce operations across multiple repos
+  doctor   Check local tools, GitHub auth, and repo access
+  repos     Discover repositories under an org or personal account
   schema    Print fully annotated sentinel.yml to stdout
   help      Show this usage message
   version   Show installed version
 
 Options:
   --config <path>   Path to config file (default: ./sentinel.yml)
+  --dry-run         Validate config and show planned changes without applying them
+
+Repo discovery:
+  git-sentinel repos list --org <org> [--format table|json|yaml]
+  git-sentinel repos list --user <user> [--visibility all|public|private]
+
+Fleet operations:
+  git-sentinel bulk plan --repos repos.txt
+  git-sentinel bulk plan --all --org <org>
+  git-sentinel bulk enforce --repos repos.txt --config sentinel.yml [--format table|json]
+
+Doctor:
+  git-sentinel doctor [--config sentinel.yml]
+  git-sentinel doctor --org <org> --repo <repo>
 EOF
 }
 
@@ -50,9 +81,46 @@ EOF
 # ---------------------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    init|enforce|schema|help|version)
+    init|diff|schema|help|version|doctor)
       COMMAND="$1"
       shift
+      ;;
+    repos)
+      COMMAND="repos"
+      shift
+      ;;
+    bulk)
+      COMMAND="bulk"
+      shift
+      ;;
+    list)
+      if [[ "$COMMAND" == "repos" ]]; then
+        REPOS_COMMAND="list"
+        shift
+      else
+        log_fail "unknown argument: $1"
+        usage
+        exit 1
+      fi
+      ;;
+    plan)
+      if [[ "$COMMAND" == "bulk" ]]; then
+        BULK_COMMAND="plan"
+        shift
+      else
+        log_fail "unknown argument: $1"
+        usage
+        exit 1
+      fi
+      ;;
+    enforce)
+      if [[ "$COMMAND" == "bulk" ]]; then
+        BULK_COMMAND="enforce"
+        shift
+      else
+        COMMAND="$1"
+        shift
+      fi
       ;;
     --config)
       if [[ $# -lt 2 ]]; then
@@ -60,6 +128,80 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       CONFIG_PATH="$2"
+      shift 2
+      ;;
+    --dry-run)
+      DRY_RUN=true
+      shift
+      ;;
+    --org)
+      if [[ $# -lt 2 ]]; then
+        log_fail "--org requires a value"
+        exit 1
+      fi
+      REPOS_OWNER_TYPE="org"
+      REPOS_OWNER="$2"
+      shift 2
+      ;;
+    --user)
+      if [[ $# -lt 2 ]]; then
+        log_fail "--user requires a value"
+        exit 1
+      fi
+      REPOS_OWNER_TYPE="user"
+      REPOS_OWNER="$2"
+      shift 2
+      ;;
+    --repo)
+      if [[ $# -lt 2 ]]; then
+        log_fail "--repo requires a value"
+        exit 1
+      fi
+      DOCTOR_REPO="$2"
+      shift 2
+      ;;
+    --format)
+      if [[ $# -lt 2 ]]; then
+        log_fail "--format requires a value"
+        exit 1
+      fi
+      if [[ "$COMMAND" == "bulk" ]]; then
+        BULK_FORMAT="$2"
+      else
+        REPOS_FORMAT="$2"
+      fi
+      shift 2
+      ;;
+    --continue-on-error)
+      BULK_CONTINUE_ON_ERROR=true
+      shift
+      ;;
+    --visibility)
+      if [[ $# -lt 2 ]]; then
+        log_fail "--visibility requires a value"
+        exit 1
+      fi
+      REPOS_VISIBILITY="$2"
+      shift 2
+      ;;
+    --archived)
+      if [[ $# -lt 2 ]]; then
+        log_fail "--archived requires a value"
+        exit 1
+      fi
+      REPOS_ARCHIVED="$2"
+      shift 2
+      ;;
+    --all)
+      BULK_ALL=true
+      shift
+      ;;
+    --repos)
+      if [[ $# -lt 2 ]]; then
+        log_fail "--repos requires a path"
+        exit 1
+      fi
+      BULK_REPOS_FILE="$2"
       shift 2
       ;;
     *)
@@ -75,11 +217,18 @@ done
 # ---------------------------------------------------------------------------
 cmd_init() {
   check_dependencies
-  authenticate
+  if [[ "$DRY_RUN" != true ]]; then
+    authenticate
+  fi
 
   log_info "reading config: $CONFIG_PATH"
   parse_config
   validate_config
+
+  if [[ "$DRY_RUN" == true ]]; then
+    plan_init
+    return
+  fi
 
   create_repo
   ensure_branches
@@ -88,17 +237,15 @@ cmd_init() {
   generate_files
   inject_templates
 
-  # Conformance commit lands on the default branch (develop) first,
-  # then main is fast-forwarded to match. Both branches end at the same SHA.
-  git checkout develop --quiet
+  # Conformance commit lands on the configured default branch first, then the
+  # other configured branches are fast-forwarded to match.
+  git checkout "$DEFAULT_BRANCH" --quiet
   git add -A
   git commit -m "Initialize repo with git-sentinel" --quiet
-  git push origin develop --quiet
-  log_ok "pushed to develop (default)"
+  git push origin "$DEFAULT_BRANCH" --quiet
+  log_ok "pushed to $DEFAULT_BRANCH (default)"
 
-  git branch -f main develop &>/dev/null
-  git push origin main --quiet
-  log_ok "synced main to develop"
+  sync_non_default_branches
 
   # Now lock it down
   apply_rulesets
@@ -117,33 +264,38 @@ cmd_init() {
 # ---------------------------------------------------------------------------
 cmd_enforce() {
   check_dependencies
-  authenticate
+  if [[ "$DRY_RUN" != true ]]; then
+    authenticate
+  fi
 
   log_info "reading config: $CONFIG_PATH"
   parse_config
   validate_config
 
+  if [[ "$DRY_RUN" == true ]]; then
+    plan_enforce
+    return
+  fi
+
   update_repo
   ensure_branches
 
   # Generate files and push before updating rulesets.
-  # Conformance commit lands on the default branch (develop), then main is
-  # fast-forwarded so both branches stay in sync.
+  # Conformance commit lands on the configured default branch, then the other
+  # configured branches are fast-forwarded so protected branches stay in sync.
   generate_files
   inject_templates
 
-  git checkout develop --quiet 2>/dev/null || git checkout -b develop --quiet
+  git checkout "$DEFAULT_BRANCH" --quiet 2>/dev/null || git checkout -b "$DEFAULT_BRANCH" --quiet
   git add -A
   if git diff --cached --quiet; then
     log_skip "no changes to commit"
   else
     git commit -m "Enforce config with git-sentinel" --quiet
-    git push origin develop --quiet
-    log_ok "pushed to develop (default)"
+    git push origin "$DEFAULT_BRANCH" --quiet
+    log_ok "pushed to $DEFAULT_BRANCH (default)"
 
-    git branch -f main develop &>/dev/null
-    git push origin main --quiet
-    log_ok "synced main to develop"
+    sync_non_default_branches
   fi
 
   # Now update rulesets and collaborators
@@ -159,6 +311,21 @@ cmd_enforce() {
 case "${COMMAND}" in
   init)    cmd_init ;;
   enforce) cmd_enforce ;;
+  diff)    sentinel_diff ;;
+  bulk)
+    case "$BULK_COMMAND" in
+      plan) bulk_plan ;;
+      enforce) bulk_enforce ;;
+      *) bulk_usage; exit 1 ;;
+    esac
+    ;;
+  doctor)  doctor ;;
+  repos)
+    case "$REPOS_COMMAND" in
+      list) repos_list ;;
+      *) repos_usage; exit 1 ;;
+    esac
+    ;;
   schema)  schema ;;
   help)    usage ;;
   version) echo "$VERSION" ;;

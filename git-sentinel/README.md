@@ -50,6 +50,9 @@ git-sentinel init
 
 # Or, on an existing repo: cd in and update
 git-sentinel enforce
+
+# See whether an existing repo has drifted from the config
+git-sentinel diff --config sentinel.yml
 ```
 
 > `git-sentinel init` initializes the **current directory** as the working tree
@@ -62,11 +65,74 @@ git-sentinel enforce
 |---|---|
 | `init` | Create a new repo from `sentinel.yml` |
 | `enforce` | Apply/update rulesets and files on existing repo |
+| `diff` | Compare current GitHub repo state against `sentinel.yml` |
+| `bulk plan` | Preview fleet-wide enforcement across multiple repos |
+| `bulk enforce` | Apply enforcement across selected repositories |
+| `doctor` | Check local tools, GitHub auth, and repo access |
+| `repos list` | List repositories under an org or personal account |
 | `schema` | Print fully annotated `sentinel.yml` to stdout |
 | `help` | Show usage |
 | `version` | Show installed version |
 
-Only flag: `--config <path>` (default: `./sentinel.yml`)
+Flags:
+
+| Flag | What it does |
+|---|---|
+| `--config <path>` | Path to config file (default: `./sentinel.yml`) |
+| `--dry-run` | Validate config and show planned changes without applying them |
+
+Preview an operation before changing GitHub or the working tree:
+
+```bash
+git-sentinel init --dry-run
+git-sentinel enforce --dry-run
+```
+
+Check for drift before enforcing:
+
+```bash
+git-sentinel diff --config sentinel.yml
+```
+
+`diff` exits `0` when the repo matches the config and exits non-zero when drift
+is found. For ruleset JSON payloads, it reports common drift categories such as
+enforcement, branch refs, bypass actors, rule types, required status checks, and
+pull request policy.
+
+Discover repositories before bulk planning or enforcement:
+
+```bash
+git-sentinel repos list --org example-org
+git-sentinel repos list --org example-org --format json
+git-sentinel repos list --user example-user --visibility public --format yaml
+```
+
+Plan fleet-wide enforcement from a selected repo list:
+
+```bash
+git-sentinel bulk plan --repos repos.txt --config sentinel.yml
+git-sentinel bulk plan --all --org example-org --config sentinel.yml
+```
+
+Apply fleet-wide enforcement:
+
+```bash
+git-sentinel bulk enforce --repos repos.txt --config sentinel.yml
+git-sentinel bulk enforce --all --org example-org --config sentinel.yml
+git-sentinel bulk enforce --repos repos.txt --config sentinel.yml --continue-on-error
+git-sentinel bulk enforce --repos repos.txt --config sentinel.yml --format json
+```
+
+Use `bulk enforce --dry-run` when you want the same selected-repo preview from
+the enforce command path without changing repositories.
+
+Check whether your machine and GitHub account are ready:
+
+```bash
+git-sentinel doctor
+git-sentinel doctor --config sentinel.yml
+git-sentinel doctor --org example-org --repo example-repo
+```
 
 ## What It Does
 
@@ -74,10 +140,10 @@ Only flag: `--config <path>` (default: `./sentinel.yml`)
 
 1. Creates the GitHub repo (public or private)
 2. Initializes the current directory as a git repo in place (no temp clone)
-3. Sets up `main` and `develop` branches, `develop` as default
+3. Sets up configured branches, with `default_branch` as the GitHub default
 4. Generates files: `.gitattributes`, `.gitignore`, `README.md`, `LICENSE`, `GIT_REFERENCE.md`, PR template
 5. Injects user-provided templates (files or folders)
-6. Commits to `develop` and fast-forwards `main` so both branches start at the same SHA
+6. Commits to the configured default branch and fast-forwards other configured branches to the same SHA
 7. Applies rulesets (branch protection, merge rules, linear history)
 8. Adds collaborators
 9. Removes `sentinel.yml` from the working tree (it's runtime-only and gitignored)
@@ -85,6 +151,26 @@ Only flag: `--config <path>` (default: `./sentinel.yml`)
 ### On `enforce`
 
 Same as init but on an existing repo — updates rulesets, regenerates files, injects templates.
+
+### On `diff`
+
+Compares the current GitHub repo against `sentinel.yml` without applying
+changes. It checks repo settings, configured branches, default branch, rulesets,
+generated/template files on the default branch, and configured collaborators.
+
+### On `bulk enforce`
+
+Selects repositories from `--repos` or `--all --org/--user`, then runs the
+same enforcement flow for each target repo. A repo list can contain full names
+like `example-org/service-api` or bare repo names like `service-api`; bare names
+use `org:` from `sentinel.yml` or the owner passed to `--org/--user`.
+
+For bulk configs, `repo:` may be omitted because each target repo supplies its
+own name.
+
+By default, `bulk enforce` stops after the first failed repo and marks remaining
+repos as skipped in the summary. Use `--continue-on-error` to attempt every
+selected repo. Use `--format json` for a machine-readable final report.
 
 ## sentinel.yml Reference
 
@@ -96,9 +182,13 @@ repo: my-repo
 # Optional — all have sensible defaults
 visibility: private                # public or private (default: private)
 description: "Short description"   # used in default README + GitHub metadata
-required_reviews: 0                # approving reviews before merge into main
+branches:
+  - main
+  - develop
+default_branch: develop
+required_reviews: 0                # generated-ruleset fallback only
 delete_branch_on_merge: true       # auto-delete feature branches after merge
-require_code_owner_review: false   # require CODEOWNERS review
+require_code_owner_review: false   # generated-ruleset fallback only
 
 # Files
 readme: ./README.md                # custom README path (omit for auto-generated)
@@ -107,6 +197,11 @@ license: gpl-3.0                   # any SPDX key GitHub supports (omit to skip)
 # People
 collaborators:
   - kamesh
+
+# Rulesets
+rulesets:
+  - ./rulesets/protect-main.json
+  - ./rulesets/protect-develop.json
 
 # Templates — files or folders to inject into the repo
 templates:
@@ -118,7 +213,38 @@ Run `git-sentinel schema` for the full annotated reference.
 
 ## Rulesets
 
-git-sentinel creates two rulesets via the GitHub Rulesets API:
+git-sentinel supports two ruleset modes.
+
+### JSON Payloads
+
+For durable, versioned policy, put GitHub Rulesets API payloads in JSON files
+and reference them from `sentinel.yml`:
+
+```yaml
+rulesets:
+  - ./rulesets/protect-main.json
+  - ./rulesets/protect-develop.json
+```
+
+Each JSON file must exist, parse as JSON, and include a `name`. Paths are
+resolved relative to `sentinel.yml`. git-sentinel uses the name to create or
+update the matching repository ruleset, and passes the payload to GitHub without
+trying to understand every rule option. Put bypass actors, status checks,
+required reviews, code-owner review, merge methods, branch targeting, and
+future GitHub ruleset options in the JSON. GitHub validates ruleset semantics.
+
+If GitHub reports that rulesets are unavailable for a private repository plan,
+`doctor`, `diff`, and `enforce` skip the ruleset step with the GitHub reason and
+continue validating the rest of the repo policy.
+
+### Generated Defaults
+
+If `rulesets:` is omitted, git-sentinel creates compatibility rulesets via the
+GitHub Rulesets API for the configured branches. The configured
+`default_branch` gets the integration-branch policy: pull requests, squash merge,
+and zero required reviews. Other configured branches get the release-branch
+policy: pull requests, configured review count, optional code-owner review, and
+merge/rebase allowed.
 
 ### protect-main
 
@@ -129,7 +255,7 @@ git-sentinel creates two rulesets via the GitHub Rulesets API:
 | Branch deletion | Blocked |
 | Pull request required | Yes, reviews from config |
 | Code owner review | From config |
-| Allowed merge methods | Merge commit only |
+| Allowed merge methods | Merge commit + rebase |
 | Linear history | Required |
 
 ### protect-develop
@@ -155,6 +281,32 @@ git-sentinel creates two rulesets via the GitHub Rulesets API:
 | `GIT_REFERENCE.md` | Branch strategy, merge rules, common commands, recovery guide |
 | `.github/PULL_REQUEST_TEMPLATE.md` | What, Why, How, Testing, Checklist |
 
+## Tests
+
+Run the offline fixture tests from the repo root:
+
+```bash
+git-sentinel/test/run.sh
+```
+
+The test harness validates shell syntax, ruleset JSON transport basics, sample
+dry-runs, bulk dry-runs, and generated file output.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for released changes and unreleased work.
+
+## Guided Skill
+
+The repo includes a Codex skill for guided policy creation:
+
+```text
+git-sentinel/skills/repo-policy/SKILL.md
+```
+
+Use it when you want an AI assistant to interview for repository intent and
+generate `sentinel.yml` plus `rulesets/*.json`.
+
 ## FAQ
 
 **"repo already exists" on init**
@@ -169,6 +321,10 @@ Install via: `brew install yq jq` (Mac), `scoop install yq jq` (Windows), `apt i
 **CRLF warnings**
 Fixed by `.gitattributes` auto-generation. Existing repos: run `enforce` to add it.
 
+**`init` failed halfway**
+See [Recovery Guide — Interrupted `init`](docs/recovery-init.md). In most cases,
+fix the cause and run `git-sentinel enforce --config sentinel.yml`.
+
 ## Project Structure
 
 ```
@@ -181,6 +337,7 @@ git-sentinel/
 │   ├── repo.sh               # Repo creation and update
 │   ├── branches.sh           # Branch management
 │   ├── rulesets.sh            # GitHub Rulesets API
+│   ├── diff.sh                # Drift detection
 │   ├── files.sh              # File generation
 │   ├── templates.sh           # Template injection
 │   ├── schema.sh             # Schema output
@@ -190,9 +347,21 @@ git-sentinel/
 │   └── PR_TEMPLATE.md
 ├── docs/
 │   ├── best-practices-public.md
-│   └── best-practices-private.md
+│   ├── best-practices-private.md
+│   └── recovery-init.md
+├── samples/
+│   ├── public/
+│   └── private/
 └── sentinel.example.yml       # Full annotated config
 ```
+
+## Samples
+
+See [`samples/`](samples/) for public and private repository policy examples.
+Each profile includes a `sentinel.yml` that points at GitHub Rulesets JSON
+payloads. The JSON demonstrates required status checks, bypass actors, bypass
+teams, required reviews, code-owner review, allowed merge methods, linear
+history, deletion protection, and force-push protection.
 
 ## Release Flow
 

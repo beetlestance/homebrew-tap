@@ -1,0 +1,26 @@
+name: CI
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+
+jobs:
+  git-sentinel:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq ruby
+          sudo snap install yq
+
+      - name: Run git-sentinel tests
+        run: git-sentinel/test/run.sh

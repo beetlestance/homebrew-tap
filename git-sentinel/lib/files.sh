@@ -56,7 +56,20 @@ generate_git_reference() {
     exit "$EXIT_FS_ERROR"
   fi
 
-  sed "s/\[from config\]/$REQUIRED_REVIEWS/" "$template" > GIT_REFERENCE.md
+  local release_branch="$DEFAULT_BRANCH"
+  local branch
+  for branch in ${BRANCHES[@]+"${BRANCHES[@]}"}; do
+    if [[ "$branch" != "$DEFAULT_BRANCH" ]]; then
+      release_branch="$branch"
+      break
+    fi
+  done
+
+  sed \
+    -e "s/\[from config\]/$REQUIRED_REVIEWS/g" \
+    -e "s/\[default branch\]/$DEFAULT_BRANCH/g" \
+    -e "s/\[release branch\]/$release_branch/g" \
+    "$template" > GIT_REFERENCE.md
   log_ok "GIT_REFERENCE.md"
 }
 

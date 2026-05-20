@@ -16,6 +16,16 @@ Reference document for git-sentinel. Defines what the tool enforces, recommends,
 
 `main` and `develop` are protected. All other branches are ephemeral.
 
+These are the default branch names. Repositories can choose different names in
+`sentinel.yml`:
+
+```yaml
+branches:
+  - stable
+  - trunk
+default_branch: trunk
+```
+
 ---
 
 ## Merge Rules
@@ -52,9 +62,27 @@ Feature, release, and fix branches are not protected. They can be created, force
 ## PR Requirements
 
 - PRs are required before merging into any protected branch
-- **Required approving reviews**: set by `required_reviews` in `sentinel.yml` — git-sentinel applies whatever the user configures (default: `0`)
+- **Required approving reviews**: set in ruleset JSON when `rulesets:` is configured; otherwise `required_reviews` is used by the generated fallback ruleset
 - Stale reviews are dismissed on push (enabled on `main` ruleset)
 - The tool does not hardcode a review count. Repository owners decide.
+
+---
+
+## Ruleset JSON
+
+For public repositories, prefer committed GitHub Rulesets JSON payloads and
+reference them from `sentinel.yml`:
+
+```yaml
+rulesets:
+  - ./rulesets/protect-main.json
+  - ./rulesets/protect-develop.json
+```
+
+Keep policy-specific details in those JSON files: required status checks,
+bypass actors, review counts, code-owner review, branch targeting, and merge
+methods. git-sentinel validates the files and sends them to GitHub; GitHub owns
+the ruleset schema.
 
 ---
 

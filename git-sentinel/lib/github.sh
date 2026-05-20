@@ -30,7 +30,7 @@ authenticate() {
 
 add_collaborators() {
   [[ ${#COLLABORATORS[@]} -eq 0 ]] && return 0
-  for user in "${COLLABORATORS[@]}"; do
+  for user in ${COLLABORATORS[@]+"${COLLABORATORS[@]}"}; do
     [[ -z "$user" ]] && continue
     if gh_api --method PUT "/repos/$ORG/$REPO_NAME/collaborators/$user" -f permission=push &>/dev/null; then
       log_ok "collaborator added: $user"

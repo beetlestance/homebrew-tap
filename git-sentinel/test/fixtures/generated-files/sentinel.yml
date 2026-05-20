@@ -1,0 +1,9 @@
+org: example-org
+repo: generated-fixture
+visibility: private
+description: "Generated file fixture"
+branches:
+  - stable
+  - trunk
+default_branch: trunk
+delete_branch_on_merge: true
