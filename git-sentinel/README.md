@@ -66,7 +66,19 @@ git-sentinel enforce
 | `help` | Show usage |
 | `version` | Show installed version |
 
-Only flag: `--config <path>` (default: `./sentinel.yml`)
+Flags:
+
+| Flag | What it does |
+|---|---|
+| `--config <path>` | Path to config file (default: `./sentinel.yml`) |
+| `--dry-run` | Validate config and show planned changes without applying them |
+
+Preview an operation before changing GitHub or the working tree:
+
+```bash
+git-sentinel init --dry-run
+git-sentinel enforce --dry-run
+```
 
 ## What It Does
 

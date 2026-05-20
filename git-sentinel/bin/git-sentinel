@@ -25,13 +25,14 @@ trap 'rm -rf "${WORK_DIR:-}"' EXIT
 VERSION="git-sentinel v2.0.1"
 CONFIG_PATH="./sentinel.yml"
 COMMAND=""
+DRY_RUN=false
 
 # ---------------------------------------------------------------------------
 # Usage
 # ---------------------------------------------------------------------------
 usage() {
   cat <<EOF
-Usage: git-sentinel <command> [--config <path>]
+Usage: git-sentinel <command> [--config <path>] [--dry-run]
 
 Commands:
   init      Create a new repo from sentinel.yml
@@ -42,6 +43,7 @@ Commands:
 
 Options:
   --config <path>   Path to config file (default: ./sentinel.yml)
+  --dry-run         Validate config and show planned changes without applying them
 EOF
 }
 
@@ -62,6 +64,10 @@ while [[ $# -gt 0 ]]; do
       CONFIG_PATH="$2"
       shift 2
       ;;
+    --dry-run)
+      DRY_RUN=true
+      shift
+      ;;
     *)
       log_fail "unknown argument: $1"
       usage
@@ -75,11 +81,18 @@ done
 # ---------------------------------------------------------------------------
 cmd_init() {
   check_dependencies
-  authenticate
+  if [[ "$DRY_RUN" != true ]]; then
+    authenticate
+  fi
 
   log_info "reading config: $CONFIG_PATH"
   parse_config
   validate_config
+
+  if [[ "$DRY_RUN" == true ]]; then
+    plan_init
+    return
+  fi
 
   create_repo
   ensure_branches
@@ -117,11 +130,18 @@ cmd_init() {
 # ---------------------------------------------------------------------------
 cmd_enforce() {
   check_dependencies
-  authenticate
+  if [[ "$DRY_RUN" != true ]]; then
+    authenticate
+  fi
 
   log_info "reading config: $CONFIG_PATH"
   parse_config
   validate_config
+
+  if [[ "$DRY_RUN" == true ]]; then
+    plan_enforce
+    return
+  fi
 
   update_repo
   ensure_branches
