@@ -73,38 +73,14 @@ test_unset_config_arrays() {
 }
 
 test_macos_bash_dry_run() {
-  local tmp_dir config
-  tmp_dir=$(mktemp -d)
-  config="$tmp_dir/sentinel.yml"
-  mkdir -p "$tmp_dir/rulesets"
-
-  cat > "$config" <<'YAML'
-org: example-org
-repo: macos-bash-fixture
-visibility: private
-description: "macOS bash fixture"
-branches:
-  - main
-  - develop
-default_branch: develop
-delete_branch_on_merge: true
-rulesets:
-  - ./rulesets/protect-main.json
-YAML
-
-  cat > "$tmp_dir/rulesets/protect-main.json" <<'JSON'
-{
-  "name": "protect-main"
-}
-JSON
+  local config
+  config="$ROOT_DIR/test/fixtures/macos-bash/sentinel.yml"
 
   (
-    cd "$tmp_dir"
+    cd "$(dirname "$config")"
     /bin/bash "$BIN" init --dry-run --config "$config" >/tmp/git-sentinel-macos-bash.out
   )
   assert_contains /tmp/git-sentinel-macos-bash.out "dry run complete" "macOS bash dry-run handles empty arrays"
-
-  rm -rf "$tmp_dir"
 }
 
 test_bulk_dry_run_without_repo_field() {
