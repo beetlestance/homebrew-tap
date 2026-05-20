@@ -18,6 +18,10 @@ Each profile includes:
 - `rulesets/protect-main.json` — example GitHub Rulesets API payload
 - `rulesets/protect-develop.json` — example GitHub Rulesets API payload
 
+The sample configs use the default `main` and `develop` branch model, but
+`branches:` and `default_branch:` can be changed for repositories that use names
+such as `stable`, `trunk`, or `next`.
+
 The ruleset JSON files demonstrate policy options such as required status
 checks, bypass actors, bypass teams, review counts, code-owner review, allowed
 merge methods, linear history, deletion protection, and force-push protection.

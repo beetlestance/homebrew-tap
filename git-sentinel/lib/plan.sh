@@ -53,12 +53,50 @@ plan_rulesets() {
     return
   fi
 
-  plan_list_items "rulesets to apply" \
-    "protect-main: PR required, $REQUIRED_REVIEWS approving review(s), code owner review: $REQUIRE_CODE_OWNER_REVIEW, merge/rebase allowed, linear history" \
-    "protect-develop: PR required, 0 approving reviews, squash merge only, linear history"
+  local rulesets=()
+  local branch
+  for branch in "${BRANCHES[@]}"; do
+    if [[ "$branch" == "$DEFAULT_BRANCH" ]]; then
+      rulesets+=("protect-$branch: PR required, 0 approving reviews, squash merge only, linear history")
+    else
+      rulesets+=("protect-$branch: PR required, $REQUIRED_REVIEWS approving review(s), code owner review: $REQUIRE_CODE_OWNER_REVIEW, merge/rebase allowed, linear history")
+    fi
+  done
+
+  plan_list_items "rulesets to apply" "${rulesets[@]}"
   plan_list_items "bypass users" "${BYPASS_USERS[@]}"
   plan_list_items "bypass teams" "${BYPASS_TEAMS[@]}"
   plan_list_items "bypass apps" "${BYPASS_APPS[@]}"
+}
+
+plan_branch_actions() {
+  local mode="$1"
+  local actions=()
+  local branch
+
+  for branch in "${BRANCHES[@]}"; do
+    if [[ "$mode" == "init" ]]; then
+      actions+=("create or push $branch")
+    else
+      actions+=("create or push $branch if missing")
+    fi
+  done
+
+  actions+=("set $DEFAULT_BRANCH as default branch")
+
+  if [[ "$mode" == "init" ]]; then
+    actions+=("commit generated files to $DEFAULT_BRANCH")
+    for branch in "${BRANCHES[@]}"; do
+      [[ "$branch" == "$DEFAULT_BRANCH" ]] || actions+=("fast-forward $branch to $DEFAULT_BRANCH")
+    done
+  else
+    actions+=("commit generated changes to $DEFAULT_BRANCH if needed")
+    for branch in "${BRANCHES[@]}"; do
+      [[ "$branch" == "$DEFAULT_BRANCH" ]] || actions+=("fast-forward $branch to $DEFAULT_BRANCH if changes were committed")
+    done
+  fi
+
+  plan_list_items "branch actions" "${actions[@]}"
 }
 
 plan_init() {
@@ -68,12 +106,7 @@ plan_init() {
     "set delete_branch_on_merge to $DELETE_BRANCH_ON_MERGE" \
     "initialize current directory as git repo" \
     "add origin https://github.com/$ORG/$REPO_NAME.git"
-  plan_list_items "branch actions" \
-    "create or push main" \
-    "create or push develop" \
-    "set develop as default branch" \
-    "commit generated files to develop" \
-    "fast-forward main to develop"
+  plan_branch_actions "init"
   plan_files
   plan_rulesets
   plan_list_items "collaborators to add" "${COLLABORATORS[@]}"
@@ -87,12 +120,7 @@ plan_enforce() {
     "verify GitHub repo $ORG/$REPO_NAME exists" \
     "clone repo to a temp directory if not already inside a git repo" \
     "set delete_branch_on_merge to $DELETE_BRANCH_ON_MERGE"
-  plan_list_items "branch actions" \
-    "create or push main if missing" \
-    "create or push develop if missing" \
-    "set develop as default branch" \
-    "commit generated changes to develop if needed" \
-    "fast-forward main to develop if changes were committed"
+  plan_branch_actions "enforce"
   plan_files
   plan_rulesets
   plan_list_items "collaborators to add" "${COLLABORATORS[@]}"

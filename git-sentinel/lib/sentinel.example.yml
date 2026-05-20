@@ -13,12 +13,22 @@ visibility: private
 # Short description — used in default README and GitHub repo metadata
 description: "A short description of this repo"
 
-# Number of required approving reviews before merge into main (default: 0)
+# Branches git-sentinel creates and keeps in sync during init/enforce.
+# If omitted, defaults to main + develop.
+branches:
+  - main
+  - develop
+
+# Default branch for GitHub and generated conformance commits.
+# Must also be listed under branches.
+default_branch: develop
+
+# Number of required approving reviews before merge into non-default branches (default: 0)
 # Used only when `rulesets:` is omitted and git-sentinel generates default rulesets.
 required_reviews: 0
 
 # Auto-delete feature branches after PR is merged (default: true)
-# Only affects feature/*, fix/*, release-* — protected branches (main, develop) are never deleted
+# Only affects source branches after merged PRs — protected branches are never deleted
 delete_branch_on_merge: true
 
 # Require review from Code Owners before merge (default: false)

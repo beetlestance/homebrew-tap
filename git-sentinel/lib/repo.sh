@@ -48,7 +48,7 @@ create_repo() {
   update_repo_settings
 
   # Initialize git in place
-  git init -b main &>/dev/null
+  git init -b "$DEFAULT_BRANCH" &>/dev/null
   git remote add origin "https://github.com/$ORG/$REPO_NAME.git" &>/dev/null
   log_ok "git initialized in place: $PWD"
 }

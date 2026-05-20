@@ -3,6 +3,11 @@ repo: internal-service
 visibility: private
 description: "Internal service managed with git-sentinel"
 
+branches:
+  - main
+  - develop
+default_branch: develop
+
 delete_branch_on_merge: true
 
 # Private repos may omit a license.

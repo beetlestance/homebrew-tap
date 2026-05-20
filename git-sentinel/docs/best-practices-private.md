@@ -61,6 +61,10 @@ org: beetlestance
 repo: internal-tool
 visibility: private
 description: "Internal tooling for X"
+branches:
+  - main
+  - develop
+default_branch: develop
 delete_branch_on_merge: true
 rulesets:
   - ./rulesets/protect-main.json

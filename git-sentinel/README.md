@@ -113,10 +113,10 @@ git-sentinel doctor --org example-org --repo example-repo
 
 1. Creates the GitHub repo (public or private)
 2. Initializes the current directory as a git repo in place (no temp clone)
-3. Sets up `main` and `develop` branches, `develop` as default
+3. Sets up configured branches, with `default_branch` as the GitHub default
 4. Generates files: `.gitattributes`, `.gitignore`, `README.md`, `LICENSE`, `GIT_REFERENCE.md`, PR template
 5. Injects user-provided templates (files or folders)
-6. Commits to `develop` and fast-forwards `main` so both branches start at the same SHA
+6. Commits to the configured default branch and fast-forwards other configured branches to the same SHA
 7. Applies rulesets (branch protection, merge rules, linear history)
 8. Adds collaborators
 9. Removes `sentinel.yml` from the working tree (it's runtime-only and gitignored)
@@ -135,6 +135,10 @@ repo: my-repo
 # Optional — all have sensible defaults
 visibility: private                # public or private (default: private)
 description: "Short description"   # used in default README + GitHub metadata
+branches:
+  - main
+  - develop
+default_branch: develop
 required_reviews: 0                # generated-ruleset fallback only
 delete_branch_on_merge: true       # auto-delete feature branches after merge
 require_code_owner_review: false   # generated-ruleset fallback only
@@ -184,8 +188,12 @@ ruleset options in the JSON.
 
 ### Generated Defaults
 
-If `rulesets:` is omitted, git-sentinel creates two compatibility rulesets via
-the GitHub Rulesets API:
+If `rulesets:` is omitted, git-sentinel creates compatibility rulesets via the
+GitHub Rulesets API for the configured branches. The configured
+`default_branch` gets the integration-branch policy: pull requests, squash merge,
+and zero required reviews. Other configured branches get the release-branch
+policy: pull requests, configured review count, optional code-owner review, and
+merge/rebase allowed.
 
 ### protect-main
 

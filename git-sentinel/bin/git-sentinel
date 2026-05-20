@@ -216,17 +216,15 @@ cmd_init() {
   generate_files
   inject_templates
 
-  # Conformance commit lands on the default branch (develop) first,
-  # then main is fast-forwarded to match. Both branches end at the same SHA.
-  git checkout develop --quiet
+  # Conformance commit lands on the configured default branch first, then the
+  # other configured branches are fast-forwarded to match.
+  git checkout "$DEFAULT_BRANCH" --quiet
   git add -A
   git commit -m "Initialize repo with git-sentinel" --quiet
-  git push origin develop --quiet
-  log_ok "pushed to develop (default)"
+  git push origin "$DEFAULT_BRANCH" --quiet
+  log_ok "pushed to $DEFAULT_BRANCH (default)"
 
-  git branch -f main develop &>/dev/null
-  git push origin main --quiet
-  log_ok "synced main to develop"
+  sync_non_default_branches
 
   # Now lock it down
   apply_rulesets
@@ -262,23 +260,21 @@ cmd_enforce() {
   ensure_branches
 
   # Generate files and push before updating rulesets.
-  # Conformance commit lands on the default branch (develop), then main is
-  # fast-forwarded so both branches stay in sync.
+  # Conformance commit lands on the configured default branch, then the other
+  # configured branches are fast-forwarded so protected branches stay in sync.
   generate_files
   inject_templates
 
-  git checkout develop --quiet 2>/dev/null || git checkout -b develop --quiet
+  git checkout "$DEFAULT_BRANCH" --quiet 2>/dev/null || git checkout -b "$DEFAULT_BRANCH" --quiet
   git add -A
   if git diff --cached --quiet; then
     log_skip "no changes to commit"
   else
     git commit -m "Enforce config with git-sentinel" --quiet
-    git push origin develop --quiet
-    log_ok "pushed to develop (default)"
+    git push origin "$DEFAULT_BRANCH" --quiet
+    log_ok "pushed to $DEFAULT_BRANCH (default)"
 
-    git branch -f main develop &>/dev/null
-    git push origin main --quiet
-    log_ok "synced main to develop"
+    sync_non_default_branches
   fi
 
   # Now update rulesets and collaborators

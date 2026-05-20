@@ -34,6 +34,15 @@ parse_config() {
   LICENSE=$(yq '.license // ""' "$CONFIG_PATH")
   DELETE_BRANCH_ON_MERGE=$(yq '.delete_branch_on_merge // true' "$CONFIG_PATH")
   REQUIRE_CODE_OWNER_REVIEW=$(yq '.require_code_owner_review // false' "$CONFIG_PATH")
+  DEFAULT_BRANCH=$(yq '.default_branch // "develop"' "$CONFIG_PATH")
+
+  BRANCHES=()
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && BRANCHES+=("$line")
+  done < <(yq '.branches[]' "$CONFIG_PATH" 2>/dev/null)
+  if [[ "${#BRANCHES[@]}" -eq 0 ]]; then
+    BRANCHES=("main" "develop")
+  fi
 
   BYPASS_USERS=()
   while IFS= read -r line; do
@@ -89,6 +98,23 @@ validate_config() {
 
   if [[ "$VISIBILITY" != "public" && "$VISIBILITY" != "private" ]]; then
     log_fail "visibility must be 'public' or 'private', got '$VISIBILITY'"
+    exit "$EXIT_CONFIG_ERROR"
+  fi
+
+  local branch default_found=false
+  for branch in "${BRANCHES[@]}"; do
+    if [[ "$branch" =~ [[:space:]] || "$branch" == refs/* || "$branch" == "" ]]; then
+      log_fail "invalid branch name in $CONFIG_PATH: $branch"
+      exit "$EXIT_CONFIG_ERROR"
+    fi
+
+    if [[ "$branch" == "$DEFAULT_BRANCH" ]]; then
+      default_found=true
+    fi
+  done
+
+  if [[ "$default_found" != true ]]; then
+    log_fail "default_branch must be included in branches: $DEFAULT_BRANCH"
     exit "$EXIT_CONFIG_ERROR"
   fi
 

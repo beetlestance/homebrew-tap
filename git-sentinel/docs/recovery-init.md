@@ -69,7 +69,7 @@ Then retry with:
 git-sentinel enforce --config sentinel.yml
 ```
 
-If `main` or `develop` exists remotely already, `enforce` will work with the
+If configured branches already exist remotely, `enforce` will work with the
 existing branches.
 
 ## Ruleset Application Failed

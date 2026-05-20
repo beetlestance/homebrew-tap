@@ -16,6 +16,16 @@ Reference document for git-sentinel. Defines what the tool enforces, recommends,
 
 `main` and `develop` are protected. All other branches are ephemeral.
 
+These are the default branch names. Repositories can choose different names in
+`sentinel.yml`:
+
+```yaml
+branches:
+  - stable
+  - trunk
+default_branch: trunk
+```
+
 ---
 
 ## Merge Rules

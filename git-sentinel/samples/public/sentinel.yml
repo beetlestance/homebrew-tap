@@ -3,6 +3,11 @@ repo: public-library
 visibility: public
 description: "Public library managed with git-sentinel"
 
+branches:
+  - main
+  - develop
+default_branch: develop
+
 delete_branch_on_merge: true
 
 license: gpl-3.0
