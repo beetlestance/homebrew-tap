@@ -226,12 +226,12 @@ rulesets:
   - ./rulesets/protect-develop.json
 ```
 
-Each JSON file must include a `name`. Paths are resolved relative to
-`sentinel.yml`. git-sentinel uses the name to create or update the matching
-repository ruleset, and passes the payload to GitHub without trying to
-understand every rule option. Put bypass actors, status checks, required
-reviews, code-owner review, merge methods, branch targeting, and future GitHub
-ruleset options in the JSON.
+Each JSON file must exist, parse as JSON, and include a `name`. Paths are
+resolved relative to `sentinel.yml`. git-sentinel uses the name to create or
+update the matching repository ruleset, and passes the payload to GitHub without
+trying to understand every rule option. Put bypass actors, status checks,
+required reviews, code-owner review, merge methods, branch targeting, and
+future GitHub ruleset options in the JSON. GitHub validates ruleset semantics.
 
 ### Generated Defaults
 
@@ -285,8 +285,8 @@ Run the offline fixture tests from the repo root:
 git-sentinel/test/run.sh
 ```
 
-The test harness validates shell syntax, sample ruleset JSON, sample dry-runs,
-bulk dry-runs, and generated file output.
+The test harness validates shell syntax, ruleset JSON transport basics, sample
+dry-runs, bulk dry-runs, and generated file output.
 
 ## FAQ
 

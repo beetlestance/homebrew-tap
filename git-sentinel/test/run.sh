@@ -34,16 +34,14 @@ test_shell_syntax() {
 }
 
 test_ruleset_fixtures() {
-  local ruleset name target
+  local ruleset name
 
   for ruleset in "$ROOT_DIR"/samples/*/rulesets/*.json; do
     jq empty "$ruleset"
 
     name=$(jq -r '.name // ""' "$ruleset")
-    target=$(jq -r '.target // ""' "$ruleset")
 
     [[ -n "$name" ]] || fail "ruleset name required: $ruleset"
-    [[ "$target" == "branch" ]] || fail "ruleset target must be branch: $ruleset"
 
     pass "ruleset fixture: ${ruleset#$ROOT_DIR/}"
   done

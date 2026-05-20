@@ -26,8 +26,9 @@ The ruleset JSON files demonstrate policy options such as required status
 checks, bypass actors, bypass teams, review counts, code-owner review, allowed
 merge methods, linear history, deletion protection, and force-push protection.
 
-git-sentinel validates that the files are JSON and include a `name`, then sends
-the payloads to the GitHub Rulesets API. GitHub remains the source of truth for
-which ruleset options are accepted.
+git-sentinel only validates transport basics: each ruleset file must exist,
+parse as JSON, and include a `name`. It then sends the payloads to the GitHub
+Rulesets API. GitHub remains the source of truth for which ruleset options are
+accepted.
 
 Paths in each sample `sentinel.yml` are relative to that config file.
