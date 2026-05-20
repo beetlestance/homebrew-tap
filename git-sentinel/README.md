@@ -135,9 +135,9 @@ repo: my-repo
 # Optional — all have sensible defaults
 visibility: private                # public or private (default: private)
 description: "Short description"   # used in default README + GitHub metadata
-required_reviews: 0                # approving reviews before merge into main
+required_reviews: 0                # generated-ruleset fallback only
 delete_branch_on_merge: true       # auto-delete feature branches after merge
-require_code_owner_review: false   # require CODEOWNERS review
+require_code_owner_review: false   # generated-ruleset fallback only
 
 # Files
 readme: ./README.md                # custom README path (omit for auto-generated)
@@ -147,14 +147,10 @@ license: gpl-3.0                   # any SPDX key GitHub supports (omit to skip)
 collaborators:
   - kamesh
 
-# Ruleset bypass actors (optional)
-bypass_actors:
-  users:
-    - release-admin
-  teams:
-    - repo-admins
-  apps:
-    - release-backmerge-app
+# Rulesets
+rulesets:
+  - ./rulesets/protect-main.json
+  - ./rulesets/protect-develop.json
 
 # Templates — files or folders to inject into the repo
 templates:
@@ -166,7 +162,30 @@ Run `git-sentinel schema` for the full annotated reference.
 
 ## Rulesets
 
-git-sentinel creates two rulesets via the GitHub Rulesets API:
+git-sentinel supports two ruleset modes.
+
+### JSON Payloads
+
+For durable, versioned policy, put GitHub Rulesets API payloads in JSON files
+and reference them from `sentinel.yml`:
+
+```yaml
+rulesets:
+  - ./rulesets/protect-main.json
+  - ./rulesets/protect-develop.json
+```
+
+Each JSON file must include a `name`. Paths are resolved relative to
+`sentinel.yml`. git-sentinel uses the name to create or update the matching
+repository ruleset, and passes the payload to GitHub without trying to
+understand every rule option. Put bypass actors, status checks, required
+reviews, code-owner review, merge methods, branch targeting, and future GitHub
+ruleset options in the JSON.
+
+### Generated Defaults
+
+If `rulesets:` is omitted, git-sentinel creates two compatibility rulesets via
+the GitHub Rulesets API:
 
 ### protect-main
 
@@ -177,7 +196,7 @@ git-sentinel creates two rulesets via the GitHub Rulesets API:
 | Branch deletion | Blocked |
 | Pull request required | Yes, reviews from config |
 | Code owner review | From config |
-| Allowed merge methods | Merge commit only |
+| Allowed merge methods | Merge commit + rebase |
 | Linear history | Required |
 
 ### protect-develop
@@ -253,10 +272,10 @@ git-sentinel/
 ## Samples
 
 See [`samples/`](samples/) for public and private repository policy examples.
-Each profile includes a `sentinel.yml` and example GitHub Rulesets JSON payloads
-that demonstrate required status checks, bypass actors, bypass teams, required
-reviews, code-owner review, allowed merge methods, linear history, deletion
-protection, and force-push protection.
+Each profile includes a `sentinel.yml` that points at GitHub Rulesets JSON
+payloads. The JSON demonstrates required status checks, bypass actors, bypass
+teams, required reviews, code-owner review, allowed merge methods, linear
+history, deletion protection, and force-push protection.
 
 ## Release Flow
 

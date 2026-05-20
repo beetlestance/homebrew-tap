@@ -48,6 +48,11 @@ plan_files() {
 }
 
 plan_rulesets() {
+  if [[ "${#RULESET_PATHS[@]}" -gt 0 ]]; then
+    plan_list_items "ruleset JSON files to apply" "${RULESET_PATHS[@]}"
+    return
+  fi
+
   plan_list_items "rulesets to apply" \
     "protect-main: PR required, $REQUIRED_REVIEWS approving review(s), code owner review: $REQUIRE_CODE_OWNER_REVIEW, merge/rebase allowed, linear history" \
     "protect-develop: PR required, 0 approving reviews, squash merge only, linear history"

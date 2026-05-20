@@ -75,13 +75,17 @@ existing branches.
 ## Ruleset Application Failed
 
 Ruleset failures usually mean missing permissions, unsupported repo plan/API
-access, or an auth issue.
+access, invalid ruleset JSON, or an auth issue.
 
 Run:
 
 ```bash
 git-sentinel doctor --config sentinel.yml
 ```
+
+If `sentinel.yml` uses `rulesets:`, confirm every referenced JSON file exists,
+includes a `name`, and matches the payload shape accepted by GitHub's Rulesets
+API.
 
 After fixing access, retry:
 

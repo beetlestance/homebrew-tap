@@ -14,7 +14,7 @@ All of these apply identically — see [best-practices-public.md](best-practices
 - **Linear git history**: enforced via ruleset
 - **Branch protection**: no direct push, no force push, no deletion of `main`/`develop`
 - **PR required before merge**: always
-- **Required reviews**: user-configured via `required_reviews` in `sentinel.yml` — not a public/private distinction
+- **Required reviews**: user-configured in ruleset JSON, or via `required_reviews` when using generated fallback rulesets
 - **Delete branch on merge**: enabled by default for feature/fix/release branches
 - **PR template**: same `.github/PULL_REQUEST_TEMPLATE.md` (What / Why / How / Testing / Checklist)
 - **GIT_REFERENCE.md**: same auto-generated reference document
@@ -61,8 +61,10 @@ org: beetlestance
 repo: internal-tool
 visibility: private
 description: "Internal tooling for X"
-required_reviews: 0          # solo or small team — adjust as needed
 delete_branch_on_merge: true
+rulesets:
+  - ./rulesets/protect-main.json
+  - ./rulesets/protect-develop.json
 # license: omitted — not needed for most private repos
 # No CONTRIBUTING.md injected
 ```

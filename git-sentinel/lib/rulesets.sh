@@ -127,7 +127,52 @@ create_or_update_ruleset() {
   fi
 }
 
+create_or_update_ruleset_payload() {
+  local ruleset_path="$1"
+  local name="$2"
+  local payload="$3"
+
+  local existing_id
+  existing_id=$(gh_api "/repos/$ORG/$REPO_NAME/rulesets" 2>/dev/null \
+    | jq -r --arg name "$name" 'if type=="array" then (.[] | select(.name == $name) | .id) else empty end')
+
+  if [[ -n "$existing_id" ]]; then
+    echo "$payload" | gh_api \
+      --method PUT \
+      -H "Accept: application/vnd.github+json" \
+      "/repos/$ORG/$REPO_NAME/rulesets/$existing_id" \
+      --input - > /dev/null \
+      || { log_fail "failed to update ruleset from $ruleset_path"; return "$EXIT_GITHUB_ERROR"; }
+
+    log_ok "ruleset updated from JSON: $name"
+  else
+    echo "$payload" | gh_api \
+      --method POST \
+      -H "Accept: application/vnd.github+json" \
+      "/repos/$ORG/$REPO_NAME/rulesets" \
+      --input - > /dev/null \
+      || { log_fail "failed to create ruleset from $ruleset_path"; return "$EXIT_GITHUB_ERROR"; }
+
+    log_ok "ruleset applied from JSON: $name"
+  fi
+}
+
+apply_ruleset_payloads() {
+  local ruleset_path name payload
+
+  for ruleset_path in "${RULESET_PATHS[@]}"; do
+    name=$(jq -r '.name' "$ruleset_path")
+    payload=$(jq -c '.' "$ruleset_path")
+    create_or_update_ruleset_payload "$ruleset_path" "$name" "$payload"
+  done
+}
+
 apply_rulesets() {
+  if [[ "${#RULESET_PATHS[@]}" -gt 0 ]]; then
+    apply_ruleset_payloads
+    return
+  fi
+
   # main: merge + rebase allowed (rebase enables ff push by bypass actors), no linear history
   create_or_update_ruleset "protect-main" "refs/heads/main" "$REQUIRED_REVIEWS" '["merge","rebase"]' "$REQUIRE_CODE_OWNER_REVIEW"
 

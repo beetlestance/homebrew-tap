@@ -3,34 +3,17 @@ repo: public-library
 visibility: public
 description: "Public library managed with git-sentinel"
 
-required_reviews: 2
 delete_branch_on_merge: true
-require_code_owner_review: true
 
 license: gpl-3.0
 
 collaborators:
   - repo-maintainer
 
+rulesets:
+  - ./rulesets/protect-main.json
+  - ./rulesets/protect-develop.json
+
 templates:
   - ./templates/CONTRIBUTING.md
   - ./templates/CODE_OF_CONDUCT.md
-
-# Roadmap examples: shown here as desired policy shape, not all parsed today.
-required_status_checks:
-  - ci/test
-  - ci/lint
-
-bypass_actors:
-  users:
-    - release-admin
-  teams:
-    - repo-admins
-  apps:
-    - release-backmerge-app
-
-review_policy:
-  required_approvals: 2
-  require_code_owner_review: true
-  require_last_push_approval: true
-  required_review_thread_resolution: true

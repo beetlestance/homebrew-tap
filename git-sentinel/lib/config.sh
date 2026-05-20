@@ -3,8 +3,27 @@
 # Requires: yq, log.sh (sourced before this)
 # Expects: CONFIG_PATH set by caller
 
+resolve_config_path() {
+  local path="$1"
+  local base_dir="$2"
+
+  case "$path" in
+    /*) ;;
+    *) path="$base_dir/$path" ;;
+  esac
+
+  if [[ -d "$path" ]]; then
+    cd "$path" && pwd
+  else
+    echo "$(cd "$(dirname "$path")" && pwd)/$(basename "$path")"
+  fi
+}
+
 parse_config() {
   [[ -f "$CONFIG_PATH" ]] || { log_fail "config not found: $CONFIG_PATH"; exit "$EXIT_CONFIG_ERROR"; }
+
+  local config_dir
+  config_dir=$(cd "$(dirname "$CONFIG_PATH")" && pwd)
 
   ORG=$(yq '.org // ""' "$CONFIG_PATH")
   REPO_NAME=$(yq '.repo // ""' "$CONFIG_PATH")
@@ -41,20 +60,27 @@ parse_config() {
     [[ -n "$line" ]] && TEMPLATES+=("$line")
   done < <(yq '.templates[]' "$CONFIG_PATH" 2>/dev/null)
 
+  RULESET_PATHS=()
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && RULESET_PATHS+=("$line")
+  done < <(yq '.rulesets[]' "$CONFIG_PATH" 2>/dev/null)
+
   # Resolve relative paths to absolute so they survive cd into work directories
   if [[ -n "$README_PATH" ]]; then
-    README_PATH=$(cd "$(dirname "$README_PATH")" && pwd)/$(basename "$README_PATH")
+    README_PATH=$(resolve_config_path "$README_PATH" "$config_dir")
   fi
 
   local resolved=()
   for tmpl in "${TEMPLATES[@]}"; do
-    if [[ -d "$tmpl" ]]; then
-      resolved+=("$(cd "$tmpl" && pwd)")
-    else
-      resolved+=("$(cd "$(dirname "$tmpl")" && pwd)/$(basename "$tmpl")")
-    fi
+    resolved+=("$(resolve_config_path "$tmpl" "$config_dir")")
   done
   TEMPLATES=("${resolved[@]}")
+
+  resolved=()
+  for ruleset in "${RULESET_PATHS[@]}"; do
+    resolved+=("$(resolve_config_path "$ruleset" "$config_dir")")
+  done
+  RULESET_PATHS=("${resolved[@]}")
 }
 
 validate_config() {
@@ -74,6 +100,23 @@ validate_config() {
   for tmpl in "${TEMPLATES[@]}"; do
     if [[ ! -f "$tmpl" && ! -d "$tmpl" ]]; then
       log_fail "template path does not exist: $tmpl"
+      exit "$EXIT_CONFIG_ERROR"
+    fi
+  done
+
+  for ruleset in "${RULESET_PATHS[@]}"; do
+    if [[ ! -f "$ruleset" ]]; then
+      log_fail "ruleset path does not exist: $ruleset"
+      exit "$EXIT_CONFIG_ERROR"
+    fi
+
+    if ! jq empty "$ruleset" >/dev/null 2>&1; then
+      log_fail "ruleset is not valid JSON: $ruleset"
+      exit "$EXIT_CONFIG_ERROR"
+    fi
+
+    if [[ "$(jq -r '.name // ""' "$ruleset")" == "" ]]; then
+      log_fail "ruleset JSON must include a name: $ruleset"
       exit "$EXIT_CONFIG_ERROR"
     fi
   done

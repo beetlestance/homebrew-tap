@@ -14,6 +14,7 @@ visibility: private
 description: "A short description of this repo"
 
 # Number of required approving reviews before merge into main (default: 0)
+# Used only when `rulesets:` is omitted and git-sentinel generates default rulesets.
 required_reviews: 0
 
 # Auto-delete feature branches after PR is merged (default: true)
@@ -22,13 +23,18 @@ delete_branch_on_merge: true
 
 # Require review from Code Owners before merge (default: false)
 # Set to true if your repo has a CODEOWNERS file defined
+# Used only when `rulesets:` is omitted and git-sentinel generates default rulesets.
 require_code_owner_review: false
 
-# Status checks — planned for future release
-# Will require specific CI check names to be defined
-# require_status_checks:
-#   - ci/build
-#   - ci/test
+# GitHub Rulesets JSON payloads (optional)
+# If present, these files are passed to the GitHub Rulesets API as-is, using
+# each payload's `name` field to create or update the matching ruleset.
+# Relative paths are resolved from this sentinel.yml file's directory.
+# Put policy details here: bypass actors, status checks, review requirements,
+# merge methods, branch targeting, and future GitHub ruleset options.
+rulesets:
+  - ./rulesets/protect-main.json
+  - ./rulesets/protect-develop.json
 
 # README source file path (optional)
 # If provided: that file is used as-is
@@ -43,8 +49,9 @@ license: gpl-3.0
 collaborators:
   - kamesh
 
-# Explicit ruleset bypass actors (optional)
-# If omitted, git-sentinel falls back to the authenticated user for compatibility.
+# Legacy generated-ruleset bypass actors (optional)
+# Used only when `rulesets:` is omitted and git-sentinel generates default rulesets.
+# Prefer encoding bypass actors directly in your ruleset JSON payloads.
 # Team values are GitHub team slugs. App values are GitHub App slugs.
 bypass_actors:
   users:

@@ -3,9 +3,7 @@ repo: internal-service
 visibility: private
 description: "Internal service managed with git-sentinel"
 
-required_reviews: 1
 delete_branch_on_merge: true
-require_code_owner_review: false
 
 # Private repos may omit a license.
 # license: gpl-3.0
@@ -13,21 +11,9 @@ require_code_owner_review: false
 collaborators:
   - repo-maintainer
 
+rulesets:
+  - ./rulesets/protect-main.json
+  - ./rulesets/protect-develop.json
+
 templates:
   - ./templates/README_INTERNAL.md
-
-# Roadmap examples: shown here as desired policy shape, not all parsed today.
-required_status_checks:
-  - ci/test
-
-bypass_actors:
-  teams:
-    - repo-admins
-  apps:
-    - release-backmerge-app
-
-review_policy:
-  required_approvals: 1
-  require_code_owner_review: false
-  require_last_push_approval: false
-  required_review_thread_resolution: false
