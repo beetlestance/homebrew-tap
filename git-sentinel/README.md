@@ -203,8 +203,19 @@ git-sentinel/
 ├── docs/
 │   ├── best-practices-public.md
 │   └── best-practices-private.md
+├── samples/
+│   ├── public/
+│   └── private/
 └── sentinel.example.yml       # Full annotated config
 ```
+
+## Samples
+
+See [`samples/`](samples/) for public and private repository policy examples.
+Each profile includes a `sentinel.yml` and example GitHub Rulesets JSON payloads
+that demonstrate required status checks, bypass actors, bypass teams, required
+reviews, code-owner review, allowed merge methods, linear history, deletion
+protection, and force-push protection.
 
 ## Release Flow
 
