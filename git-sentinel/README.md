@@ -288,6 +288,17 @@ git-sentinel/test/run.sh
 The test harness validates shell syntax, ruleset JSON transport basics, sample
 dry-runs, bulk dry-runs, and generated file output.
 
+## Guided Skill
+
+The repo includes a Codex skill for guided policy creation:
+
+```text
+git-sentinel/skills/repo-policy/SKILL.md
+```
+
+Use it when you want an AI assistant to interview for repository intent and
+generate `sentinel.yml` plus `rulesets/*.json`.
+
 ## FAQ
 
 **"repo already exists" on init**

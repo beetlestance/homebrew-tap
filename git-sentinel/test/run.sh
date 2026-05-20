@@ -250,6 +250,17 @@ test_bulk_json_report() {
   rm -rf "$tmp_dir"
 }
 
+test_guided_skill() {
+  local skill="$ROOT_DIR/skills/repo-policy/SKILL.md"
+
+  [[ -f "$skill" ]] || fail "guided skill exists"
+  assert_contains "$skill" "name: git-sentinel-repo-policy" "guided skill has name"
+  assert_contains "$skill" "description:" "guided skill has description"
+  assert_contains "$skill" "sentinel.yml" "guided skill generates sentinel config"
+  assert_contains "$skill" "rulesets/" "guided skill generates ruleset JSON"
+  assert_contains "$skill" "GitHub owns that" "guided skill preserves ruleset validation boundary"
+}
+
 main() {
   test_shell_syntax
   test_ruleset_fixtures
@@ -259,6 +270,7 @@ main() {
   test_formula_rewrite_script
   test_diff_ruleset_details
   test_bulk_json_report
+  test_guided_skill
   pass "all tests passed"
 }
 
