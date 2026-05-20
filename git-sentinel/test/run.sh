@@ -261,6 +261,64 @@ test_guided_skill() {
   assert_contains "$skill" "GitHub owns that" "guided skill preserves ruleset validation boundary"
 }
 
+test_doctor_repo_checks() {
+  local tmp_dir fake_bin output
+  tmp_dir=$(mktemp -d)
+  fake_bin="$tmp_dir/bin"
+  output="$tmp_dir/doctor.out"
+  mkdir -p "$fake_bin"
+
+  cat > "$fake_bin/gh" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$1" == "auth" && "$2" == "status" ]]; then
+  exit 0
+fi
+
+if [[ "$1" == "repo" && "$2" == "view" ]]; then
+  case "$3" in
+    example-org/missing)
+      exit 1
+      ;;
+    example-org/private-no-rulesets)
+      printf '{"nameWithOwner":"example-org/private-no-rulesets","visibility":"PRIVATE"}\n'
+      exit 0
+      ;;
+  esac
+fi
+
+if [[ "$1" == "api" && "$2" == "/repos/example-org/private-no-rulesets/rulesets" ]]; then
+  printf 'gh: Upgrade to GitHub Pro or make this repository public to enable this feature. (HTTP 403)\n' >&2
+  exit 1
+fi
+
+exit 1
+SH
+  chmod +x "$fake_bin/gh"
+
+  (
+    PATH="$fake_bin:$PATH"
+    # shellcheck source=/dev/null
+    source "$ROOT_DIR/lib/log.sh"
+    # shellcheck source=/dev/null
+    source "$ROOT_DIR/lib/github.sh"
+    # shellcheck source=/dev/null
+    source "$ROOT_DIR/lib/doctor.sh"
+
+    DOCTOR_FAILED=false
+    doctor_check_auth
+    doctor_check_repo_access "example-org" "missing"
+    doctor_check_repo_access "example-org" "private-no-rulesets"
+    [[ "$DOCTOR_FAILED" == false ]]
+  ) >"$output" 2>&1
+
+  assert_contains "$output" "repo access: example-org/missing (not found or inaccessible; ok before init)" "doctor skips missing repo"
+  assert_contains "$output" "private repo rulesets require GitHub Pro/Team/Enterprise or public visibility" "doctor skips private ruleset plan limitation"
+
+  rm -rf "$tmp_dir"
+}
+
 main() {
   test_shell_syntax
   test_ruleset_fixtures
@@ -271,6 +329,7 @@ main() {
   test_diff_ruleset_details
   test_bulk_json_report
   test_guided_skill
+  test_doctor_repo_checks
   pass "all tests passed"
 }
 

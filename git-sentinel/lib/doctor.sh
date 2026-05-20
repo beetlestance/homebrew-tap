@@ -34,25 +34,31 @@ doctor_check_auth() {
 doctor_check_repo_access() {
   local owner="$1"
   local repo="$2"
+  local repo_json rulesets_error visibility
 
   if [[ -z "$owner" || -z "$repo" ]]; then
     log_skip "repo access (no --org/--user and --repo provided)"
     return
   fi
 
-  if gh repo view "$owner/$repo" &>/dev/null; then
+  if repo_json=$(gh repo view "$owner/$repo" --json visibility,nameWithOwner 2>/dev/null); then
     log_ok "repo access: $owner/$repo"
   else
-    log_fail "cannot access repo: $owner/$repo"
-    DOCTOR_FAILED=true
+    log_skip "repo access: $owner/$repo (not found or inaccessible; ok before init)"
     return
   fi
 
   if gh_api "/repos/$owner/$repo/rulesets" &>/dev/null; then
     log_ok "rulesets API accessible: $owner/$repo"
   else
-    log_fail "rulesets API not accessible: $owner/$repo"
-    DOCTOR_FAILED=true
+    rulesets_error=$(gh_api "/repos/$owner/$repo/rulesets" 2>&1 >/dev/null || true)
+    visibility=$(echo "$repo_json" | jq -r '.visibility // ""')
+
+    if [[ "$visibility" == "PRIVATE" && "$rulesets_error" == *"Upgrade to GitHub Pro"* ]]; then
+      log_skip "rulesets API: $owner/$repo (private repo rulesets require GitHub Pro/Team/Enterprise or public visibility)"
+    else
+      log_skip "rulesets API: $owner/$repo (not accessible: $rulesets_error)"
+    fi
   fi
 }
 
