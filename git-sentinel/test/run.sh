@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_ROOT="$(cd "$ROOT_DIR/.." && pwd)"
 BIN="$ROOT_DIR/bin/git-sentinel"
+FORMULA_SCRIPT="$ROOT_DIR/scripts/update-formula.rb"
 
 pass() {
   printf "ok: %s\n" "$1"
@@ -28,6 +29,7 @@ assert_contains() {
 
 test_shell_syntax() {
   bash -n "$BIN" "$ROOT_DIR"/lib/*.sh
+  ruby -c "$FORMULA_SCRIPT" >/dev/null
   pass "shell syntax"
 }
 
@@ -132,12 +134,34 @@ YAML
   rm -rf "$tmp_dir"
 }
 
+test_formula_rewrite_script() {
+  local tmp_dir formula
+  tmp_dir=$(mktemp -d)
+  formula="$tmp_dir/git-sentinel.rb"
+
+  cp "$REPO_ROOT/Formula/git-sentinel.rb" "$formula"
+
+  "$FORMULA_SCRIPT" \
+    --formula "$formula" \
+    --url "https://example.com/git-sentinel-v9.8.7.tar.gz" \
+    --sha256 "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" \
+    --version "9.8.7"
+
+  assert_contains "$formula" '  url "https://example.com/git-sentinel-v9.8.7.tar.gz"' "formula rewrite updates url"
+  assert_contains "$formula" '  sha256 "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"' "formula rewrite updates sha256"
+  assert_contains "$formula" '  version "9.8.7"' "formula rewrite updates version"
+  assert_contains "$formula" '  head "https://github.com/beetlestance/homebrew-tap.git", branch: "develop"' "formula rewrite preserves head"
+
+  rm -rf "$tmp_dir"
+}
+
 main() {
   test_shell_syntax
   test_ruleset_fixtures
   test_sample_dry_runs
   test_bulk_dry_run_without_repo_field
   test_generated_files
+  test_formula_rewrite_script
   pass "all tests passed"
 }
 
