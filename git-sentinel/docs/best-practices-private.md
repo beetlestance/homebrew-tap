@@ -9,7 +9,7 @@
 
 All of these apply identically — see [best-practices-public.md](best-practices-public.md) for full details:
 
-- **Branch strategy**: `main` + `develop`, with `feature/*`, `release/*`, `fix/*`
+- **Branch strategy**: `main` + `develop`, with `feature/*`, `release-*`, `fix/*`
 - **Merge rules**: squash merge into `develop`, merge commit into `main` from `release-*`
 - **Linear git history**: enforced via ruleset
 - **Branch protection**: no direct push, no force push, no deletion of `main`/`develop`

@@ -1,0 +1,124 @@
+name: Release PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Release branch to verify
+        required: true
+
+concurrency:
+  group: release-pr-${{ github.event.pull_request.number || inputs.branch }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: (github.event_name == 'pull_request' && startsWith(github.event.pull_request.head.ref, 'release-') && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && startsWith(inputs.branch, 'release-'))
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || inputs.branch }}
+          fetch-depth: 0
+
+      - name: Extract version from branch name
+        id: version
+        run: |
+          BRANCH="${{ github.event.pull_request.head.ref || inputs.branch }}"
+
+          if [[ ! "$BRANCH" =~ ^release-git-sentinel-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release branches must match release-git-sentinel-vX.Y.Z"
+            exit 1
+          fi
+
+          TAG="${BRANCH#release-}"
+          VERSION="${TAG#git-sentinel-v}"
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Verify CLI version
+        run: |
+          EXPECTED="git-sentinel v${{ steps.version.outputs.version }}"
+          ACTUAL="$(bash git-sentinel/bin/git-sentinel version)"
+
+          if [[ "$ACTUAL" != "$EXPECTED" ]]; then
+            echo "Expected $EXPECTED, got $ACTUAL"
+            exit 1
+          fi
+
+      - name: Determine release source commit
+        id: source
+        run: |
+          FORMULA_SUBJECT="formula: git-sentinel ${{ steps.version.outputs.version }}"
+          HEAD_SUBJECT="$(git log -1 --pretty=%s)"
+
+          if [[ "$HEAD_SUBJECT" == "$FORMULA_SUBJECT" ]]; then
+            SHA="$(git rev-parse HEAD^)"
+          else
+            SHA="$(git rev-parse HEAD)"
+          fi
+
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Tag release source
+        run: |
+          git tag -f "${{ steps.version.outputs.tag }}" "${{ steps.source.outputs.sha }}"
+          git push -f origin "refs/tags/${{ steps.version.outputs.tag }}"
+
+      - name: Compute Homebrew archive checksum
+        id: archive
+        run: |
+          set -euo pipefail
+
+          URL="https://github.com/${{ github.repository }}/archive/refs/tags/${{ steps.version.outputs.tag }}.tar.gz"
+          SHA256="$(curl -fL "$URL" | sha256sum | awk '{print $1}')"
+
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Update Homebrew formula
+        run: |
+          ruby <<'RUBY'
+          formula_path = "Formula/git-sentinel.rb"
+          url = "${{ steps.archive.outputs.url }}"
+          sha256 = "${{ steps.archive.outputs.sha256 }}"
+          version = "${{ steps.version.outputs.version }}"
+
+          formula = File.read(formula_path)
+          stable_block = %(  url "#{url}"\n  sha256 "#{sha256}"\n  version "#{version}"\n)
+
+          if formula.match?(/^  url "/)
+            formula = formula.sub(/^  url ".*"\n  sha256 ".*"\n  version ".*"\n/m, stable_block)
+          else
+            formula = formula.sub(/^  head /, "#{stable_block}  head ")
+          end
+
+          File.write(formula_path, formula)
+          RUBY
+
+      - name: Commit formula update
+        run: |
+          if git diff --quiet -- Formula/git-sentinel.rb; then
+            echo "Formula already points at ${{ steps.version.outputs.tag }}"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/git-sentinel.rb
+          git commit -m "formula: git-sentinel ${{ steps.version.outputs.version }}"
+          git push origin HEAD:${{ github.event.pull_request.head.ref || inputs.branch }}
+
+          gh workflow run release-pr.yml --ref "${{ github.event.pull_request.head.ref || inputs.branch }}" -f branch="${{ github.event.pull_request.head.ref || inputs.branch }}"
+        env:
+          GH_TOKEN: ${{ github.token }}

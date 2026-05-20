@@ -1,4 +1,4 @@
-name: Release
+name: Release Publish
 
 on:
   pull_request:
@@ -15,15 +15,35 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Extract version from branch name
         id: version
         run: |
           BRANCH="${{ github.event.pull_request.head.ref }}"
-          # release-git-sentinel-v1.0.0 → git-sentinel-v1.0.0
+
+          if [[ ! "$BRANCH" =~ ^release-git-sentinel-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release branches must match release-git-sentinel-vX.Y.Z"
+            exit 1
+          fi
+
           TAG="${BRANCH#release-}"
+          VERSION="${TAG#git-sentinel-v}"
+
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "title=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Verify CLI version
+        run: |
+          EXPECTED="git-sentinel v${{ steps.version.outputs.version }}"
+          ACTUAL="$(bash git-sentinel/bin/git-sentinel version)"
+
+          if [[ "$ACTUAL" != "$EXPECTED" ]]; then
+            echo "Expected $EXPECTED, got $ACTUAL"
+            exit 1
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

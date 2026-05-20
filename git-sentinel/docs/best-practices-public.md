@@ -11,7 +11,7 @@ Reference document for git-sentinel. Defines what the tool enforces, recommends,
 | `main` | Production-ready code | — | — |
 | `develop` | Integration branch | `main` | `main` (via `release-*`) |
 | `feature/*` | New work | `develop` | `develop` |
-| `release/*` | Release stabilization | `develop` | `main` |
+| `release-*` | Release stabilization | `develop` | `main` |
 | `fix/*` | Bug fixes | `develop` | `develop` |
 
 `main` and `develop` are protected. All other branches are ephemeral.
@@ -62,7 +62,7 @@ Feature, release, and fix branches are not protected. They can be created, force
 
 Controlled by `delete_branch_on_merge` in `sentinel.yml` (default: `true`).
 
-When enabled, GitHub auto-deletes the source branch after a PR is merged. Applies to `feature/*`, `fix/*`, and `release/*` branches. Protected branches (`main`, `develop`) are never deleted regardless of this setting.
+When enabled, GitHub auto-deletes the source branch after a PR is merged. Applies to `feature/*`, `fix/*`, and `release-*` branches. Protected branches (`main`, `develop`) are never deleted regardless of this setting.
 
 ---
 
@@ -72,7 +72,7 @@ Encouraged for public repos. Not enforced by default.
 
 Public repos benefit from verified commit identity, but enforcing signatures creates friction for new contributors. Repository owners can add signature requirements manually or via org-level rulesets if needed.
 
-Out of scope for git-sentinel v1.
+Out of scope for git-sentinel.
 
 ---
 

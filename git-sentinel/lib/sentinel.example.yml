@@ -17,7 +17,7 @@ description: "A short description of this repo"
 required_reviews: 0
 
 # Auto-delete feature branches after PR is merged (default: true)
-# Only affects feature/*, fix/*, release/* — protected branches (main, develop) are never deleted
+# Only affects feature/*, fix/*, release-* — protected branches (main, develop) are never deleted
 delete_branch_on_merge: true
 
 # Require review from Code Owners before merge (default: false)

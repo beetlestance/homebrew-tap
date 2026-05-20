@@ -11,6 +11,13 @@ brew tap beetlestance/tap
 brew install git-sentinel
 ```
 
+Stable installs use the latest released formula in this tap. To install from
+the moving `develop` branch instead:
+
+```bash
+brew install --HEAD git-sentinel
+```
+
 Or run directly:
 
 ```bash
@@ -189,16 +196,24 @@ git-sentinel/
 
 ## Release Flow
 
-This repo uses a branch-based release workflow with GitHub Actions.
+This repo uses two branch-based GitHub Actions workflows:
+
+- `Release PR` (`release-pr.yml`) prepares release PRs before merge.
+- `Release Publish` (`release-publish.yml`) publishes the GitHub Release after merge.
+
+The same repository is both the source repo and the Homebrew tap; no GitHub
+Pages build or separate published artifact is needed.
 
 ```
 1. Feature work → PR to develop (squash merge)
-2. Ready to release → create branch: release-{tool}-v{version} from develop
-3. On release branch: bump version, update formula if needed, commit
-4. PR release branch → main (triggers GitHub Action: tag + release + auto-generated notes)
-5. PR release branch → develop (syncs version bump back)
-6. Merge both — main and develop stay in sync
-7. brew upgrade --HEAD git-sentinel picks up the new version
+2. Ready to release → create branch: release-git-sentinel-v{version} from develop
+3. On release branch: bump VERSION in bin/git-sentinel and commit
+4. PR release branch → main
+5. The Release PR workflow validates the version, tags the release source commit, computes the tag archive SHA256, and commits the formula update back to the release PR
+6. Open a PR from the same release branch → develop so the generated formula commit will sync back too
+7. Review and merge the main PR
+8. The Release Publish workflow creates the GitHub Release from the prepared tag
+9. Merge the develop PR to sync the version bump and formula update back
 ```
 
 ### Creating a release
@@ -207,21 +222,35 @@ This repo uses a branch-based release workflow with GitHub Actions.
 # From develop
 git checkout develop
 git pull origin develop
-git checkout -b release-git-sentinel-v1.0.2
+git checkout -b release-git-sentinel-v2.0.1
 
 # Bump version in bin/git-sentinel
-# Update formula or docs if needed
 git add -A
-git commit -m "chore: bump version to v1.0.2"
-git push -u origin release-git-sentinel-v1.0.2
+git commit -m "chore: bump version to v2.0.1"
+git push -u origin release-git-sentinel-v2.0.1
 
-# Create PRs to both main and develop
-gh pr create --base main --title "release: git-sentinel v1.0.2"
-gh pr create --base develop --title "chore: sync v1.0.2 version bump to develop"
+# Create the release PR to main
+gh pr create --base main --title "release: git-sentinel v2.0.1"
 
-# Merge both PRs
-# Main merge triggers the release workflow automatically
+# Wait for the Release PR workflow to add the formula commit and pass again.
+
+# Open the sync PR before deleting the release branch.
+gh pr create --base develop --title "chore: sync v2.0.1 version bump to develop"
+
+# Review and merge the main PR, then merge the develop PR.
 ```
+
+The release branch must be named `release-git-sentinel-vX.Y.Z`, and
+`git-sentinel version` must print the same version. For example,
+`release-git-sentinel-v2.0.1` requires `git-sentinel v2.0.1`.
+
+The formula commit is generated on the release PR before merge. That keeps the
+release atomic from Homebrew's point of view: once the PR lands on `main`,
+`brew install git-sentinel` points at the new stable tag.
+
+The prepared tag points at the release source commit before the generated
+formula commit. That keeps the source archive focused on the tool code while
+the formula update lands in the tap on `main`.
 
 ## License
 
