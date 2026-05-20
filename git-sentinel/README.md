@@ -269,6 +269,17 @@ merge/rebase allowed.
 | `GIT_REFERENCE.md` | Branch strategy, merge rules, common commands, recovery guide |
 | `.github/PULL_REQUEST_TEMPLATE.md` | What, Why, How, Testing, Checklist |
 
+## Tests
+
+Run the offline fixture tests from the repo root:
+
+```bash
+git-sentinel/test/run.sh
+```
+
+The test harness validates shell syntax, sample ruleset JSON, sample dry-runs,
+bulk dry-runs, and generated file output.
+
 ## FAQ
 
 **"repo already exists" on init**
