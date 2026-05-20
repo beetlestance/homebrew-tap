@@ -20,6 +20,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           ref: main
+          fetch-depth: 0
 
       - name: Extract version from branch name
         id: version
@@ -60,7 +61,7 @@ jobs:
         id: backmerge-token
         uses: actions/create-github-app-token@v2
         with:
-          app-id: ${{ secrets.RELEASE_BACKMERGE_APP_ID }}
+          client-id: ${{ secrets.RELEASE_BACKMERGE_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_BACKMERGE_PRIVATE_KEY }}
           owner: beetlestance
           repositories: homebrew-tap
@@ -77,7 +78,9 @@ jobs:
           fi
 
           git remote set-url origin "https://x-access-token:${BACKMERGE_TOKEN}@github.com/${{ github.repository }}.git"
-          git fetch origin develop "pull/${{ github.event.pull_request.number }}/head:release-backmerge"
-          git checkout develop
+          git fetch origin \
+            "+refs/heads/develop:refs/remotes/origin/develop" \
+            "+refs/pull/${{ github.event.pull_request.number }}/head:refs/heads/release-backmerge"
+          git checkout -B develop origin/develop
           git merge --ff-only release-backmerge
           git push origin HEAD:develop
