@@ -3,6 +3,7 @@
 # Requires: log.sh, config.sh (sourced before this)
 
 inject_templates() {
+  declare -p TEMPLATES >/dev/null 2>&1 || TEMPLATES=()
   if [[ "${#TEMPLATES[@]}" -eq 0 ]]; then return 0; fi
 
   for tmpl in "${TEMPLATES[@]}"; do

@@ -55,6 +55,23 @@ test_sample_dry_runs() {
   assert_contains /tmp/git-sentinel-private-dry-run.out "ruleset JSON files to apply" "private sample dry-run uses ruleset JSON"
 }
 
+test_unset_config_arrays() {
+  (
+    set -u
+    # shellcheck source=/dev/null
+    source "$ROOT_DIR/lib/log.sh"
+    # shellcheck source=/dev/null
+    source "$ROOT_DIR/lib/config.sh"
+    # shellcheck source=/dev/null
+    source "$ROOT_DIR/lib/templates.sh"
+
+    inject_templates
+    [[ "${#TEMPLATES[@]}" -eq 0 ]]
+    [[ "${#RULESET_PATHS[@]}" -eq 0 ]]
+  )
+  pass "unset config arrays are safe"
+}
+
 test_bulk_dry_run_without_repo_field() {
   local tmp_dir config repos output
   tmp_dir=$(mktemp -d)
@@ -323,6 +340,7 @@ main() {
   test_shell_syntax
   test_ruleset_fixtures
   test_sample_dry_runs
+  test_unset_config_arrays
   test_bulk_dry_run_without_repo_field
   test_generated_files
   test_formula_rewrite_script

@@ -3,6 +3,25 @@
 # Requires: yq, log.sh (sourced before this)
 # Expects: CONFIG_PATH set by caller
 
+ORG="${ORG:-}"
+REPO_NAME="${REPO_NAME:-}"
+VISIBILITY="${VISIBILITY:-private}"
+DESCRIPTION="${DESCRIPTION:-}"
+REQUIRED_REVIEWS="${REQUIRED_REVIEWS:-0}"
+README_PATH="${README_PATH:-}"
+LICENSE="${LICENSE:-}"
+DELETE_BRANCH_ON_MERGE="${DELETE_BRANCH_ON_MERGE:-true}"
+REQUIRE_CODE_OWNER_REVIEW="${REQUIRE_CODE_OWNER_REVIEW:-false}"
+DEFAULT_BRANCH="${DEFAULT_BRANCH:-develop}"
+
+declare -p BRANCHES >/dev/null 2>&1 || BRANCHES=("main" "develop")
+declare -p BYPASS_USERS >/dev/null 2>&1 || BYPASS_USERS=()
+declare -p BYPASS_TEAMS >/dev/null 2>&1 || BYPASS_TEAMS=()
+declare -p BYPASS_APPS >/dev/null 2>&1 || BYPASS_APPS=()
+declare -p COLLABORATORS >/dev/null 2>&1 || COLLABORATORS=()
+declare -p TEMPLATES >/dev/null 2>&1 || TEMPLATES=()
+declare -p RULESET_PATHS >/dev/null 2>&1 || RULESET_PATHS=()
+
 resolve_config_path() {
   local path="$1"
   local base_dir="$2"
