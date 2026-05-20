@@ -208,6 +208,10 @@ Install via: `brew install yq jq` (Mac), `scoop install yq jq` (Windows), `apt i
 **CRLF warnings**
 Fixed by `.gitattributes` auto-generation. Existing repos: run `enforce` to add it.
 
+**`init` failed halfway**
+See [Recovery Guide — Interrupted `init`](docs/recovery-init.md). In most cases,
+fix the cause and run `git-sentinel enforce --config sentinel.yml`.
+
 ## Project Structure
 
 ```
@@ -229,7 +233,8 @@ git-sentinel/
 │   └── PR_TEMPLATE.md
 ├── docs/
 │   ├── best-practices-public.md
-│   └── best-practices-private.md
+│   ├── best-practices-private.md
+│   └── recovery-init.md
 ├── samples/
 │   ├── public/
 │   └── private/
