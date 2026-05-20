@@ -6,6 +6,14 @@ All notable git-sentinel changes are documented here.
 
 No unreleased changes yet.
 
+## git-sentinel v3.0.2 - 2026-05-20
+
+### Fixed
+
+- Fixed release backmerge pushes so checkout's default `GITHUB_TOKEN`
+  credentials are cleared before pushing to `develop` with the release GitHub
+  App token.
+
 ## git-sentinel v3.0.1 - 2026-05-20
 
 ### Changed

@@ -160,6 +160,7 @@ jobs:
           fi
 
           git remote set-url origin "https://x-access-token:${BACKMERGE_TOKEN}@github.com/${{ github.repository }}.git"
+          git config --local --unset-all http.https://github.com/.extraheader || true
           git fetch origin \
             "+refs/heads/develop:refs/remotes/origin/develop" \
             "+refs/pull/${{ github.event.pull_request.number }}/head:refs/heads/release-backmerge"
