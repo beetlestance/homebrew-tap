@@ -63,6 +63,7 @@ git-sentinel enforce
 | `init` | Create a new repo from `sentinel.yml` |
 | `enforce` | Apply/update rulesets and files on existing repo |
 | `bulk plan` | Preview fleet-wide enforcement across multiple repos |
+| `doctor` | Check local tools, GitHub auth, and repo access |
 | `repos list` | List repositories under an org or personal account |
 | `schema` | Print fully annotated `sentinel.yml` to stdout |
 | `help` | Show usage |
@@ -96,6 +97,14 @@ Plan fleet-wide enforcement from a selected repo list:
 git-sentinel repos list --org example-org --format json > repos.json
 git-sentinel bulk plan --repos repos.txt --config sentinel.yml
 git-sentinel bulk plan --all --org example-org --config sentinel.yml
+```
+
+Check whether your machine and GitHub account are ready:
+
+```bash
+git-sentinel doctor
+git-sentinel doctor --config sentinel.yml
+git-sentinel doctor --org example-org --repo example-repo
 ```
 
 ## What It Does
