@@ -48,7 +48,7 @@ Commands:
   init      Create a new repo from sentinel.yml
   enforce   Apply/update rulesets and files on existing repo
   diff      Compare current repo state against sentinel.yml
-  bulk     Plan fleet-wide operations across multiple repos
+  bulk     Plan or enforce operations across multiple repos
   doctor   Check local tools, GitHub auth, and repo access
   repos     Discover repositories under an org or personal account
   schema    Print fully annotated sentinel.yml to stdout
@@ -63,9 +63,10 @@ Repo discovery:
   git-sentinel repos list --org <org> [--format table|json|yaml]
   git-sentinel repos list --user <user> [--visibility all|public|private]
 
-Fleet planning:
+Fleet operations:
   git-sentinel bulk plan --repos repos.txt
   git-sentinel bulk plan --all --org <org>
+  git-sentinel bulk enforce --repos repos.txt --config sentinel.yml
 
 Doctor:
   git-sentinel doctor [--config sentinel.yml]
@@ -78,7 +79,7 @@ EOF
 # ---------------------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    init|enforce|diff|schema|help|version|doctor)
+    init|diff|schema|help|version|doctor)
       COMMAND="$1"
       shift
       ;;
@@ -108,6 +109,15 @@ while [[ $# -gt 0 ]]; do
         log_fail "unknown argument: $1"
         usage
         exit 1
+      fi
+      ;;
+    enforce)
+      if [[ "$COMMAND" == "bulk" ]]; then
+        BULK_COMMAND="enforce"
+        shift
+      else
+        COMMAND="$1"
+        shift
       fi
       ;;
     --config)
@@ -295,6 +305,7 @@ case "${COMMAND}" in
   bulk)
     case "$BULK_COMMAND" in
       plan) bulk_plan ;;
+      enforce) bulk_enforce ;;
       *) bulk_usage; exit 1 ;;
     esac
     ;;

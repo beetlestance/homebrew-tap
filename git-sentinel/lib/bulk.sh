@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# bulk.sh — fleet planning commands
-# Requires: gh, jq, log.sh, repos.sh (sourced before this)
+# bulk.sh — fleet planning and enforcement commands
+# Requires: gh, git, jq, log.sh, repos.sh, config.sh, repo.sh, branches.sh,
+#           files.sh, templates.sh, rulesets.sh, github.sh (sourced before this)
 
 bulk_usage() {
   cat <<EOF
-Usage: git-sentinel bulk plan (--repos <path> | --all --org <org> | --all --user <user>) [options]
+Usage: git-sentinel bulk <plan|enforce> (--repos <path> | --all --org <org> | --all --user <user>) [options]
 
 Options:
   --repos <path>              File containing repo names or full names, one per line
@@ -18,7 +19,7 @@ EOF
 }
 
 bulk_validate() {
-  if [[ "$BULK_COMMAND" != "plan" ]]; then
+  if [[ "$BULK_COMMAND" != "plan" && "$BULK_COMMAND" != "enforce" ]]; then
     log_fail "bulk requires a subcommand"
     bulk_usage
     exit "$EXIT_CONFIG_ERROR"
@@ -30,13 +31,13 @@ bulk_validate() {
   fi
 
   if [[ "$BULK_ALL" != true && -z "$BULK_REPOS_FILE" ]]; then
-    log_fail "bulk plan requires --repos <path> or --all"
+    log_fail "bulk $BULK_COMMAND requires --repos <path> or --all"
     bulk_usage
     exit "$EXIT_CONFIG_ERROR"
   fi
 
   if [[ "$BULK_ALL" == true && "$REPOS_OWNER_TYPE" != "org" && "$REPOS_OWNER_TYPE" != "user" ]]; then
-    log_fail "bulk plan --all requires --org <org> or --user <user>"
+    log_fail "bulk $BULK_COMMAND --all requires --org <org> or --user <user>"
     bulk_usage
     exit "$EXIT_CONFIG_ERROR"
   fi
@@ -45,6 +46,23 @@ bulk_validate() {
     log_fail "repo list not found: $BULK_REPOS_FILE"
     exit "$EXIT_CONFIG_ERROR"
   fi
+}
+
+bulk_load_config() {
+  if [[ ! -f "$CONFIG_PATH" ]]; then
+    log_fail "config not found: $CONFIG_PATH"
+    exit "$EXIT_CONFIG_ERROR"
+  fi
+
+  log_info "reading config: $CONFIG_PATH"
+  ALLOW_EMPTY_REPO=true
+  parse_config
+
+  if [[ -z "$ORG" && -n "$REPOS_OWNER" ]]; then
+    ORG="$REPOS_OWNER"
+  fi
+
+  validate_config
 }
 
 bulk_repos_from_file() {
@@ -71,12 +89,121 @@ bulk_print_plan() {
   plan_list_items "per-repo actions" \
     "read desired policy from $CONFIG_PATH" \
     "validate repo access" \
-    "apply or update branch rulesets" \
+    "create or update configured branches" \
+    "apply or update rulesets" \
     "generate or update repository files" \
     "inject configured templates" \
     "add configured collaborators"
 
   log_ok "bulk dry run complete — no changes made"
+}
+
+bulk_target_owner_repo() {
+  local target="$1"
+  local owner repo
+
+  if [[ "$target" == */* ]]; then
+    owner="${target%%/*}"
+    repo="${target#*/}"
+  else
+    owner="$ORG"
+    repo="$target"
+  fi
+
+  if [[ -z "$owner" || -z "$repo" ]]; then
+    log_fail "invalid bulk repo target: $target"
+    return "$EXIT_CONFIG_ERROR"
+  fi
+
+  printf "%s\t%s\n" "$owner" "$repo"
+}
+
+bulk_enforce_one() {
+  local target="$1"
+  local target_owner target_repo original_org original_repo previous_dir repo_dir
+
+  IFS=$'\t' read -r target_owner target_repo < <(bulk_target_owner_repo "$target")
+  original_org="$ORG"
+  original_repo="$REPO_NAME"
+  previous_dir="$PWD"
+
+  ORG="$target_owner"
+  REPO_NAME="$target_repo"
+
+  log_info "bulk enforce: $ORG/$REPO_NAME"
+
+  repo_dir=$(mktemp -d)
+  if ! gh repo clone "$ORG/$REPO_NAME" "$repo_dir" &>/dev/null; then
+    log_fail "failed to clone repo: $ORG/$REPO_NAME"
+    ORG="$original_org"
+    REPO_NAME="$original_repo"
+    return "$EXIT_GITHUB_ERROR"
+  fi
+
+  cd "$repo_dir" || return "$EXIT_FS_ERROR"
+
+  update_repo_settings
+  ensure_branches
+  generate_files
+  inject_templates
+
+  git checkout "$DEFAULT_BRANCH" --quiet 2>/dev/null || git checkout -b "$DEFAULT_BRANCH" --quiet
+  git add -A
+  if git diff --cached --quiet; then
+    log_skip "$ORG/$REPO_NAME: no file changes to commit"
+  else
+    git commit -m "Enforce config with git-sentinel" --quiet
+    git push origin "$DEFAULT_BRANCH" --quiet
+    log_ok "$ORG/$REPO_NAME: pushed to $DEFAULT_BRANCH"
+    sync_non_default_branches
+  fi
+
+  apply_rulesets
+  add_collaborators
+
+  cd "$previous_dir" || return "$EXIT_FS_ERROR"
+  rm -rf "$repo_dir"
+
+  ORG="$original_org"
+  REPO_NAME="$original_repo"
+}
+
+bulk_enforce() {
+  bulk_validate
+  check_dependencies
+  if [[ "$DRY_RUN" != true || "$BULK_ALL" == true ]]; then
+    authenticate
+  fi
+  bulk_load_config
+
+  local repos count failed=0 target
+  if [[ "$BULK_ALL" == true ]]; then
+    repos=$(bulk_repos_from_discovery)
+  else
+    repos=$(bulk_repos_from_file)
+  fi
+
+  count=$(echo "$repos" | jq 'length')
+  log_info "bulk enforce: $count repo(s) selected"
+
+  if [[ "$DRY_RUN" == true ]]; then
+    bulk_print_plan "$repos"
+    return
+  fi
+
+  while IFS= read -r target; do
+    if ! bulk_enforce_one "$target"; then
+      log_fail "bulk enforce failed: $target"
+      failed=$((failed + 1))
+    fi
+  done < <(echo "$repos" | jq -r '.[]')
+
+  if [[ "$failed" -gt 0 ]]; then
+    log_fail "bulk enforce completed with $failed failure(s)"
+    exit "$EXIT_GITHUB_ERROR"
+  fi
+
+  log_ok "bulk enforce complete"
 }
 
 bulk_plan() {
@@ -92,9 +219,7 @@ bulk_plan() {
   fi
 
   if [[ -f "$CONFIG_PATH" ]]; then
-    log_info "reading config: $CONFIG_PATH"
-    parse_config
-    validate_config
+    bulk_load_config
   else
     log_warn "config not found: $CONFIG_PATH"
     log_warn "bulk plan will show repo selection only"

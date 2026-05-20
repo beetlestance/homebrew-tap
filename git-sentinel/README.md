@@ -67,6 +67,7 @@ git-sentinel diff --config sentinel.yml
 | `enforce` | Apply/update rulesets and files on existing repo |
 | `diff` | Compare current GitHub repo state against `sentinel.yml` |
 | `bulk plan` | Preview fleet-wide enforcement across multiple repos |
+| `bulk enforce` | Apply enforcement across selected repositories |
 | `doctor` | Check local tools, GitHub auth, and repo access |
 | `repos list` | List repositories under an org or personal account |
 | `schema` | Print fully annotated `sentinel.yml` to stdout |
@@ -107,10 +108,19 @@ git-sentinel repos list --user example-user --visibility public --format yaml
 Plan fleet-wide enforcement from a selected repo list:
 
 ```bash
-git-sentinel repos list --org example-org --format json > repos.json
 git-sentinel bulk plan --repos repos.txt --config sentinel.yml
 git-sentinel bulk plan --all --org example-org --config sentinel.yml
 ```
+
+Apply fleet-wide enforcement:
+
+```bash
+git-sentinel bulk enforce --repos repos.txt --config sentinel.yml
+git-sentinel bulk enforce --all --org example-org --config sentinel.yml
+```
+
+Use `bulk enforce --dry-run` when you want the same selected-repo preview from
+the enforce command path without changing repositories.
 
 Check whether your machine and GitHub account are ready:
 
@@ -143,6 +153,16 @@ Same as init but on an existing repo — updates rulesets, regenerates files, in
 Compares the current GitHub repo against `sentinel.yml` without applying
 changes. It checks repo settings, configured branches, default branch, rulesets,
 generated/template files on the default branch, and configured collaborators.
+
+### On `bulk enforce`
+
+Selects repositories from `--repos` or `--all --org/--user`, then runs the
+same enforcement flow for each target repo. A repo list can contain full names
+like `example-org/service-api` or bare repo names like `service-api`; bare names
+use `org:` from `sentinel.yml` or the owner passed to `--org/--user`.
+
+For bulk configs, `repo:` may be omitted because each target repo supplies its
+own name.
 
 ## sentinel.yml Reference
 

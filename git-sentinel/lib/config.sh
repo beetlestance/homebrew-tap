@@ -94,7 +94,10 @@ parse_config() {
 
 validate_config() {
   [[ -n "$ORG" ]] || { log_fail "org is required in $CONFIG_PATH"; exit "$EXIT_CONFIG_ERROR"; }
-  [[ -n "$REPO_NAME" ]] || { log_fail "repo is required in $CONFIG_PATH"; exit "$EXIT_CONFIG_ERROR"; }
+  if [[ -z "$REPO_NAME" && "${ALLOW_EMPTY_REPO:-false}" != true ]]; then
+    log_fail "repo is required in $CONFIG_PATH"
+    exit "$EXIT_CONFIG_ERROR"
+  fi
 
   if [[ "$VISIBILITY" != "public" && "$VISIBILITY" != "private" ]]; then
     log_fail "visibility must be 'public' or 'private', got '$VISIBILITY'"
@@ -147,5 +150,5 @@ validate_config() {
     fi
   done
 
-  log_ok "config validated: $ORG/$REPO_NAME"
+  log_ok "config validated: $ORG/${REPO_NAME:-<bulk-target>}"
 }
