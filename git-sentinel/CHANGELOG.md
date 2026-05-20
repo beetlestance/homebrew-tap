@@ -4,6 +4,10 @@ All notable git-sentinel changes are documented here.
 
 ## Unreleased
 
+No unreleased changes yet.
+
+## git-sentinel v3.0.0 - 2026-05-20
+
 ### Added
 
 - Added dry-run planning for `init` and `enforce`.
