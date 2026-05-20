@@ -49,6 +49,28 @@ jobs:
             exit 1
           fi
 
+      - name: Build Homebrew release asset
+        id: asset
+        run: |
+          set -euo pipefail
+
+          ASSET="git-sentinel-${{ steps.version.outputs.version }}.tar.gz"
+          ASSET_PATH="$RUNNER_TEMP/$ASSET"
+          git ls-tree -rz -r --name-only HEAD git-sentinel \
+            | tar \
+              --null \
+              --files-from=- \
+              --sort=name \
+              --mtime="UTC 1970-01-01" \
+              --owner=0 \
+              --group=0 \
+              --numeric-owner \
+              --transform="s#^#git-sentinel-${{ steps.version.outputs.version }}/#" \
+              -cf - \
+            | gzip -n > "$ASSET_PATH"
+
+          echo "path=$ASSET_PATH" >> "$GITHUB_OUTPUT"
+
       - name: Generate release notes
         id: release-notes
         env:
@@ -115,11 +137,13 @@ jobs:
               --latest
           fi
 
+          gh release upload "$TAG" "${{ steps.asset.outputs.path }}" --clobber
+
       - name: Generate backmerge token
         id: backmerge-token
         uses: actions/create-github-app-token@v2
         with:
-          client-id: ${{ secrets.RELEASE_BACKMERGE_CLIENT_ID }}
+          app-id: ${{ secrets.RELEASE_BACKMERGE_APP_ID }}
           private-key: ${{ secrets.RELEASE_BACKMERGE_PRIVATE_KEY }}
           owner: beetlestance
           repositories: homebrew-tap

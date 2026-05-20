@@ -6,6 +6,22 @@ All notable git-sentinel changes are documented here.
 
 No unreleased changes yet.
 
+## git-sentinel v3.0.1 - 2026-05-20
+
+### Changed
+
+- Changed stable Homebrew releases to use uploaded release assets instead of
+  GitHub tag source archives.
+- Updated the release flow so release tags can point at the final formula commit
+  on `main`.
+- Updated Release PR formula pushes to use the release GitHub App token so
+  required PR checks run on generated commits.
+
+### Fixed
+
+- Fixed the release workflow loop where generated formula commits could leave
+  required checks waiting for statuses on the latest PR head.
+
 ## git-sentinel v3.0.0 - 2026-05-20
 
 ### Added

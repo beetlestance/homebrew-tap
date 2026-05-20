@@ -370,35 +370,36 @@ This repo uses two branch-based GitHub Actions workflows:
 - `Release PR` (`release-pr.yml`) prepares release PRs before merge.
 - `Release Publish` (`release-publish.yml`) publishes the GitHub Release after merge.
 
-The same repository is both the source repo and the Homebrew tap; no GitHub
-Pages build or separate published artifact is needed.
+The same repository is both the source repo and the Homebrew tap. Stable
+Homebrew installs use an uploaded release asset so the release tag can point at
+the final formula commit without creating a circular checksum.
 
 ```
 1. Feature work → PR to develop (squash merge)
-2. Ready to release → create branch: release-git-sentinel-v{version} from develop
+2. Ready to release → create branch: release-git-sentinel-v{version} from main
 3. On release branch: bump VERSION in bin/git-sentinel and commit
 4. PR release branch → main
-5. The Release PR workflow validates the version, tags the release source commit, computes the tag archive SHA256, and commits the formula update back to the release PR
+5. The Release PR workflow validates the version, computes the release asset SHA256, and commits the formula update back to the release PR
 6. Review and merge the main PR
-7. The Release Publish workflow creates the GitHub Release from the prepared tag
+7. The Release Publish workflow creates the GitHub Release, uploads the prepared asset, and keeps the tag on the release PR head
 8. The Release Publish workflow fast-forwards develop to the release PR head
 ```
 
 ### Creating a release
 
 ```bash
-# From develop
-git checkout develop
-git pull origin develop
-git checkout -b release-git-sentinel-v2.0.1
+# From main
+git checkout main
+git pull origin main
+git checkout -b release-git-sentinel-v3.0.1
 
-# Bump version in bin/git-sentinel
+# Bump version in bin/git-sentinel and update CHANGELOG.md
 git add -A
-git commit -m "chore: bump version to v2.0.1"
-git push -u origin release-git-sentinel-v2.0.1
+git commit -m "release: git-sentinel v3.0.1"
+git push -u origin release-git-sentinel-v3.0.1
 
 # Create the release PR to main
-gh pr create --base main --title "release: git-sentinel v2.0.1"
+gh pr create --base main --title "release: git-sentinel v3.0.1"
 
 # Wait for the Release PR workflow to add the formula commit and pass again.
 
@@ -412,23 +413,24 @@ The release branch must be named `release-git-sentinel-vX.Y.Z`, and
 
 The formula commit is generated on the release PR before merge. That keeps the
 release atomic from Homebrew's point of view: once the PR lands on `main`,
-`brew install git-sentinel` points at the new stable tag.
+`brew install git-sentinel` points at the new stable release asset.
 
-The prepared tag points at the release source commit before the generated
-formula commit. That keeps the source archive focused on the tool code while
-the formula update lands in the tap on `main`.
+The prepared tag points at the final release PR head, including the generated
+formula commit. The Homebrew formula points at an uploaded release asset that
+contains the `git-sentinel/` tree, so the asset checksum does not depend on the
+formula file itself.
 
 Release Publish updates `develop` with a fast-forward-only merge from the
 release PR head. If `develop` moved after the release branch was created, the
 fast-forward fails; rebase the release branch onto the latest `develop` and
 rerun the release.
 
-The fast-forward step uses a short-lived GitHub App installation token generated
-from `RELEASE_BACKMERGE_APP_ID` and `RELEASE_BACKMERGE_PRIVATE_KEY`. Install the
-app only on this repository and make that app the only bypass actor for the
-`develop` ruleset's pull request requirement. GitHub rulesets bypass actors,
-not individual workflow files, so these secrets should only be used by Release
-Publish.
+Release PR and Release Publish use short-lived GitHub App installation tokens
+generated from `RELEASE_BACKMERGE_APP_ID` and
+`RELEASE_BACKMERGE_PRIVATE_KEY`. Install the app only on this repository and
+make that app the only bypass actor for the `develop` ruleset's pull request
+requirement. GitHub rulesets bypass actors, not individual workflow files, so
+these secrets should only be used by release workflows.
 
 ## License
 

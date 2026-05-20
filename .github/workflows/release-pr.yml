@@ -27,11 +27,21 @@ jobs:
       pull-requests: write
 
     steps:
+      - name: Generate release token
+        id: release-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_BACKMERGE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_BACKMERGE_PRIVATE_KEY }}
+          owner: beetlestance
+          repositories: homebrew-tap
+
       - name: Checkout release branch
         uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.ref || inputs.branch }}
           fetch-depth: 0
+          token: ${{ steps.release-token.outputs.token }}
 
       - name: Extract version from branch name
         id: version
@@ -59,32 +69,28 @@ jobs:
             exit 1
           fi
 
-      - name: Determine release source commit
-        id: source
-        run: |
-          FORMULA_SUBJECT="formula: git-sentinel ${{ steps.version.outputs.version }}"
-          HEAD_SUBJECT="$(git log -1 --pretty=%s)"
-
-          if [[ "$HEAD_SUBJECT" == "$FORMULA_SUBJECT" ]]; then
-            SHA="$(git rev-parse HEAD^)"
-          else
-            SHA="$(git rev-parse HEAD)"
-          fi
-
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-
-      - name: Tag release source
-        run: |
-          git tag -f "${{ steps.version.outputs.tag }}" "${{ steps.source.outputs.sha }}"
-          git push -f origin "refs/tags/${{ steps.version.outputs.tag }}"
-
-      - name: Compute Homebrew archive checksum
-        id: archive
+      - name: Build Homebrew release asset
+        id: asset
         run: |
           set -euo pipefail
 
-          URL="https://github.com/${{ github.repository }}/archive/refs/tags/${{ steps.version.outputs.tag }}.tar.gz"
-          SHA256="$(curl -fL "$URL" | sha256sum | awk '{print $1}')"
+          ASSET="git-sentinel-${{ steps.version.outputs.version }}.tar.gz"
+          ASSET_PATH="$RUNNER_TEMP/$ASSET"
+          URL="https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/$ASSET"
+          git ls-tree -rz -r --name-only HEAD git-sentinel \
+            | tar \
+              --null \
+              --files-from=- \
+              --sort=name \
+              --mtime="UTC 1970-01-01" \
+              --owner=0 \
+              --group=0 \
+              --numeric-owner \
+              --transform="s#^#git-sentinel-${{ steps.version.outputs.version }}/#" \
+              -cf - \
+            | gzip -n > "$ASSET_PATH"
+
+          SHA256="$(sha256sum "$ASSET_PATH" | awk '{print $1}')"
 
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
@@ -92,14 +98,16 @@ jobs:
       - name: Update Homebrew formula
         run: |
           git-sentinel/scripts/update-formula.rb \
-            --url "${{ steps.archive.outputs.url }}" \
-            --sha256 "${{ steps.archive.outputs.sha256 }}" \
+            --url "${{ steps.asset.outputs.url }}" \
+            --sha256 "${{ steps.asset.outputs.sha256 }}" \
             --version "${{ steps.version.outputs.version }}"
 
       - name: Commit formula update
+        id: formula
         run: |
           if git diff --quiet -- Formula/git-sentinel.rb; then
             echo "Formula already points at ${{ steps.version.outputs.tag }}"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -107,8 +115,13 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Formula/git-sentinel.rb
           git commit -m "formula: git-sentinel ${{ steps.version.outputs.version }}"
+          git remote set-url origin "https://x-access-token:${{ steps.release-token.outputs.token }}@github.com/${{ github.repository }}.git"
           git push origin HEAD:${{ github.event.pull_request.head.ref || inputs.branch }}
 
-          gh workflow run release-pr.yml --ref "${{ github.event.pull_request.head.ref || inputs.branch }}" -f branch="${{ github.event.pull_request.head.ref || inputs.branch }}"
-        env:
-          GH_TOKEN: ${{ github.token }}
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Tag release head
+        if: steps.formula.outputs.changed == 'false'
+        run: |
+          git tag -f "${{ steps.version.outputs.tag }}" HEAD
+          git push -f origin "refs/tags/${{ steps.version.outputs.tag }}"
