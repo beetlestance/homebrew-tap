@@ -36,8 +36,7 @@ Confirm:
 
 ## Repo Was Created, Then Init Failed
 
-If GitHub repo creation succeeded but a later step failed, do not run `init`
-again. Run:
+If GitHub repo creation succeeded but a later step failed, run:
 
 ```bash
 git-sentinel enforce --config sentinel.yml
@@ -48,16 +47,20 @@ and collaborators to an existing repo.
 
 ## Local Git Repo Was Initialized
 
-If `.git/` exists locally, `init` will refuse to run again.
+If `.git/` exists locally and `origin` already points at the configured
+`org/repo`, `init` can continue the setup. This covers the common case where a
+repo was created on GitHub, local git was initialized, and a later init step
+failed.
 
-Use:
+If `.git/` points somewhere else, `init` stops instead of rewriting your
+existing repository. Use:
 
 ```bash
 git-sentinel enforce --config sentinel.yml
 ```
 
-Only remove `.git/` if you intentionally want to discard the local repository
-and start over.
+Only remove `.git/` if you intentionally want to discard the local repository and
+start over.
 
 ## Branch Push Failed
 
@@ -90,6 +93,11 @@ git-sentinel doctor --config sentinel.yml
 If `sentinel.yml` uses `rulesets:`, confirm every referenced JSON file exists,
 includes a `name`, and matches the payload shape accepted by GitHub's Rulesets
 API.
+
+For private repositories, GitHub may require a paid plan before repository
+rulesets are available. In that case, `doctor`, `diff`, and `enforce` report the
+rulesets as skipped with the GitHub reason instead of failing the entire run.
+Generated files, repo settings, branches, and collaborators can still be applied.
 
 After fixing access, retry:
 

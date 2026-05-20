@@ -233,6 +233,10 @@ trying to understand every rule option. Put bypass actors, status checks,
 required reviews, code-owner review, merge methods, branch targeting, and
 future GitHub ruleset options in the JSON. GitHub validates ruleset semantics.
 
+If GitHub reports that rulesets are unavailable for a private repository plan,
+`doctor`, `diff`, and `enforce` skip the ruleset step with the GitHub reason and
+continue validating the rest of the repo policy.
+
 ### Generated Defaults
 
 If `rulesets:` is omitted, git-sentinel creates compatibility rulesets via the
