@@ -51,6 +51,54 @@ resolve_bypass_actors() {
   echo "$actors"
 }
 
+rulesets_api_error_message() {
+  local error="$1"
+
+  if [[ "$error" == *"Upgrade to GitHub Pro"* ]]; then
+    echo "private repo rulesets require GitHub Pro/Team/Enterprise or public visibility"
+  else
+    echo "$error"
+  fi
+}
+
+rulesets_api_available() {
+  local error
+
+  if gh_api "/repos/$ORG/$REPO_NAME/rulesets" >/dev/null 2>/tmp/git-sentinel-rulesets-error; then
+    rm -f /tmp/git-sentinel-rulesets-error
+    return 0
+  fi
+
+  error=$(cat /tmp/git-sentinel-rulesets-error 2>/dev/null || true)
+  rm -f /tmp/git-sentinel-rulesets-error
+  log_skip "rulesets API: $ORG/$REPO_NAME ($(rulesets_api_error_message "$error"))"
+  return 1
+}
+
+rulesets_api_apply() {
+  local action="$1"
+  local name="$2"
+  local endpoint="$3"
+  local payload="$4"
+  local error_file
+  error_file=$(mktemp)
+
+  if echo "$payload" | gh_api \
+    --method "$action" \
+    -H "Accept: application/vnd.github+json" \
+    "$endpoint" \
+    --input - > /dev/null 2>"$error_file"; then
+    rm -f "$error_file"
+    return 0
+  fi
+
+  local error
+  error=$(cat "$error_file")
+  rm -f "$error_file"
+  log_fail "failed to apply ruleset $name: $(rulesets_api_error_message "$error")"
+  return "$EXIT_GITHUB_ERROR"
+}
+
 create_or_update_ruleset() {
   local name="$1"
   local branch_pattern="$2"
@@ -107,20 +155,12 @@ create_or_update_ruleset() {
     local ruleset_id
     ruleset_id=$(echo "$existing" | jq -r '.id')
 
-    echo "$payload" | gh_api \
-      --method PUT \
-      -H "Accept: application/vnd.github+json" \
-      "/repos/$ORG/$REPO_NAME/rulesets/$ruleset_id" \
-      --input - > /dev/null \
+    rulesets_api_apply PUT "$name" "/repos/$ORG/$REPO_NAME/rulesets/$ruleset_id" "$payload" \
       || { log_fail "failed to update ruleset: $name"; return "$EXIT_GITHUB_ERROR"; }
 
     log_ok "ruleset updated: $name"
   else
-    echo "$payload" | gh_api \
-      --method POST \
-      -H "Accept: application/vnd.github+json" \
-      "/repos/$ORG/$REPO_NAME/rulesets" \
-      --input - > /dev/null \
+    rulesets_api_apply POST "$name" "/repos/$ORG/$REPO_NAME/rulesets" "$payload" \
       || { log_fail "failed to create ruleset: $name"; return "$EXIT_GITHUB_ERROR"; }
 
     log_ok "ruleset applied: $name"
@@ -137,20 +177,12 @@ create_or_update_ruleset_payload() {
     | jq -r --arg name "$name" 'if type=="array" then (.[] | select(.name == $name) | .id) else empty end')
 
   if [[ -n "$existing_id" ]]; then
-    echo "$payload" | gh_api \
-      --method PUT \
-      -H "Accept: application/vnd.github+json" \
-      "/repos/$ORG/$REPO_NAME/rulesets/$existing_id" \
-      --input - > /dev/null \
+    rulesets_api_apply PUT "$name" "/repos/$ORG/$REPO_NAME/rulesets/$existing_id" "$payload" \
       || { log_fail "failed to update ruleset from $ruleset_path"; return "$EXIT_GITHUB_ERROR"; }
 
     log_ok "ruleset updated from JSON: $name"
   else
-    echo "$payload" | gh_api \
-      --method POST \
-      -H "Accept: application/vnd.github+json" \
-      "/repos/$ORG/$REPO_NAME/rulesets" \
-      --input - > /dev/null \
+    rulesets_api_apply POST "$name" "/repos/$ORG/$REPO_NAME/rulesets" "$payload" \
       || { log_fail "failed to create ruleset from $ruleset_path"; return "$EXIT_GITHUB_ERROR"; }
 
     log_ok "ruleset applied from JSON: $name"
@@ -168,6 +200,10 @@ apply_ruleset_payloads() {
 }
 
 apply_rulesets() {
+  if ! rulesets_api_available; then
+    return 0
+  fi
+
   if [[ "${#RULESET_PATHS[@]}" -gt 0 ]]; then
     apply_ruleset_payloads
     return
