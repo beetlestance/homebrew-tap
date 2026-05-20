@@ -1,5 +1,8 @@
 name: Release Publish
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   pull_request:
     types: [closed]
@@ -14,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: main
 
@@ -52,3 +55,29 @@ jobs:
           name: ${{ steps.version.outputs.title }}
           generate_release_notes: true
           make_latest: true
+
+      - name: Generate backmerge token
+        id: backmerge-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_BACKMERGE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_BACKMERGE_PRIVATE_KEY }}
+          owner: beetlestance
+          repositories: homebrew-tap
+
+      - name: Fast-forward develop
+        env:
+          BACKMERGE_TOKEN: ${{ steps.backmerge-token.outputs.token }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${BACKMERGE_TOKEN:-}" ]]; then
+            echo "::error::Failed to generate release backmerge GitHub App token"
+            exit 1
+          fi
+
+          git remote set-url origin "https://x-access-token:${BACKMERGE_TOKEN}@github.com/${{ github.repository }}.git"
+          git fetch origin develop "pull/${{ github.event.pull_request.number }}/head:release-backmerge"
+          git checkout develop
+          git merge --ff-only release-backmerge
+          git push origin HEAD:develop

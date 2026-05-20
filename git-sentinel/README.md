@@ -210,10 +210,9 @@ Pages build or separate published artifact is needed.
 3. On release branch: bump VERSION in bin/git-sentinel and commit
 4. PR release branch → main
 5. The Release PR workflow validates the version, tags the release source commit, computes the tag archive SHA256, and commits the formula update back to the release PR
-6. Open a PR from the same release branch → develop so the generated formula commit will sync back too
-7. Review and merge the main PR
-8. The Release Publish workflow creates the GitHub Release from the prepared tag
-9. Merge the develop PR to sync the version bump and formula update back
+6. Review and merge the main PR
+7. The Release Publish workflow creates the GitHub Release from the prepared tag
+8. The Release Publish workflow fast-forwards develop to the release PR head
 ```
 
 ### Creating a release
@@ -234,10 +233,8 @@ gh pr create --base main --title "release: git-sentinel v2.0.1"
 
 # Wait for the Release PR workflow to add the formula commit and pass again.
 
-# Open the sync PR before deleting the release branch.
-gh pr create --base develop --title "chore: sync v2.0.1 version bump to develop"
-
-# Review and merge the main PR, then merge the develop PR.
+# Review and merge the main PR.
+# Release Publish will create the GitHub Release and fast-forward develop.
 ```
 
 The release branch must be named `release-git-sentinel-vX.Y.Z`, and
@@ -251,6 +248,18 @@ release atomic from Homebrew's point of view: once the PR lands on `main`,
 The prepared tag points at the release source commit before the generated
 formula commit. That keeps the source archive focused on the tool code while
 the formula update lands in the tap on `main`.
+
+Release Publish updates `develop` with a fast-forward-only merge from the
+release PR head. If `develop` moved after the release branch was created, the
+fast-forward fails; rebase the release branch onto the latest `develop` and
+rerun the release.
+
+The fast-forward step uses a short-lived GitHub App installation token generated
+from `RELEASE_BACKMERGE_APP_ID` and `RELEASE_BACKMERGE_PRIVATE_KEY`. Install the
+app only on this repository and make that app the only bypass actor for the
+`develop` ruleset's pull request requirement. GitHub rulesets bypass actors,
+not individual workflow files, so these secrets should only be used by Release
+Publish.
 
 ## License
 

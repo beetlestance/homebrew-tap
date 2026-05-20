@@ -1,5 +1,8 @@
 name: Release PR
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -25,7 +28,7 @@ jobs:
 
     steps:
       - name: Checkout release branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.ref || inputs.branch }}
           fetch-depth: 0
@@ -98,7 +101,7 @@ jobs:
           stable_block = %(  url "#{url}"\n  sha256 "#{sha256}"\n  version "#{version}"\n)
 
           if formula.match?(/^  url "/)
-            formula = formula.sub(/^  url ".*"\n  sha256 ".*"\n  version ".*"\n/m, stable_block)
+            formula = formula.sub(/^  url ".*"\n  sha256 ".*"\n  version ".*"\n/, stable_block)
           else
             formula = formula.sub(/^  head /, "#{stable_block}  head ")
           end
