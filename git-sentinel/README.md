@@ -292,6 +292,10 @@ git-sentinel/test/run.sh
 The test harness validates shell syntax, ruleset JSON transport basics, sample
 dry-runs, bulk dry-runs, and generated file output.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for released changes and unreleased work.
+
 ## Guided Skill
 
 The repo includes a Codex skill for guided policy creation:
