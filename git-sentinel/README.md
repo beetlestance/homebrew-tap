@@ -62,6 +62,7 @@ git-sentinel enforce
 |---|---|
 | `init` | Create a new repo from `sentinel.yml` |
 | `enforce` | Apply/update rulesets and files on existing repo |
+| `bulk plan` | Preview fleet-wide enforcement across multiple repos |
 | `repos list` | List repositories under an org or personal account |
 | `schema` | Print fully annotated `sentinel.yml` to stdout |
 | `help` | Show usage |
@@ -87,6 +88,14 @@ Discover repositories before bulk planning or enforcement:
 git-sentinel repos list --org example-org
 git-sentinel repos list --org example-org --format json
 git-sentinel repos list --user example-user --visibility public --format yaml
+```
+
+Plan fleet-wide enforcement from a selected repo list:
+
+```bash
+git-sentinel repos list --org example-org --format json > repos.json
+git-sentinel bulk plan --repos repos.txt --config sentinel.yml
+git-sentinel bulk plan --all --org example-org --config sentinel.yml
 ```
 
 ## What It Does

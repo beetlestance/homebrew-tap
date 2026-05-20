@@ -26,6 +26,9 @@ VERSION="git-sentinel v2.0.1"
 CONFIG_PATH="./sentinel.yml"
 COMMAND=""
 DRY_RUN=false
+BULK_COMMAND=""
+BULK_ALL=false
+BULK_REPOS_FILE=""
 REPOS_COMMAND=""
 REPOS_OWNER_TYPE=""
 REPOS_OWNER=""
@@ -43,6 +46,7 @@ Usage: git-sentinel <command> [options]
 Commands:
   init      Create a new repo from sentinel.yml
   enforce   Apply/update rulesets and files on existing repo
+  bulk     Plan fleet-wide operations across multiple repos
   repos     Discover repositories under an org or personal account
   schema    Print fully annotated sentinel.yml to stdout
   help      Show this usage message
@@ -55,6 +59,10 @@ Options:
 Repo discovery:
   git-sentinel repos list --org <org> [--format table|json|yaml]
   git-sentinel repos list --user <user> [--visibility all|public|private]
+
+Fleet planning:
+  git-sentinel bulk plan --repos repos.txt
+  git-sentinel bulk plan --all --org <org>
 EOF
 }
 
@@ -71,9 +79,23 @@ while [[ $# -gt 0 ]]; do
       COMMAND="repos"
       shift
       ;;
+    bulk)
+      COMMAND="bulk"
+      shift
+      ;;
     list)
       if [[ "$COMMAND" == "repos" ]]; then
         REPOS_COMMAND="list"
+        shift
+      else
+        log_fail "unknown argument: $1"
+        usage
+        exit 1
+      fi
+      ;;
+    plan)
+      if [[ "$COMMAND" == "bulk" ]]; then
+        BULK_COMMAND="plan"
         shift
       else
         log_fail "unknown argument: $1"
@@ -133,6 +155,18 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       REPOS_ARCHIVED="$2"
+      shift 2
+      ;;
+    --all)
+      BULK_ALL=true
+      shift
+      ;;
+    --repos)
+      if [[ $# -lt 2 ]]; then
+        log_fail "--repos requires a path"
+        exit 1
+      fi
+      BULK_REPOS_FILE="$2"
       shift 2
       ;;
     *)
@@ -246,6 +280,12 @@ cmd_enforce() {
 case "${COMMAND}" in
   init)    cmd_init ;;
   enforce) cmd_enforce ;;
+  bulk)
+    case "$BULK_COMMAND" in
+      plan) bulk_plan ;;
+      *) bulk_usage; exit 1 ;;
+    esac
+    ;;
   repos)
     case "$REPOS_COMMAND" in
       list) repos_list ;;
