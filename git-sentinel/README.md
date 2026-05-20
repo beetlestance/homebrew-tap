@@ -62,6 +62,7 @@ git-sentinel enforce
 |---|---|
 | `init` | Create a new repo from `sentinel.yml` |
 | `enforce` | Apply/update rulesets and files on existing repo |
+| `repos list` | List repositories under an org or personal account |
 | `schema` | Print fully annotated `sentinel.yml` to stdout |
 | `help` | Show usage |
 | `version` | Show installed version |
@@ -78,6 +79,14 @@ Preview an operation before changing GitHub or the working tree:
 ```bash
 git-sentinel init --dry-run
 git-sentinel enforce --dry-run
+```
+
+Discover repositories before bulk planning or enforcement:
+
+```bash
+git-sentinel repos list --org example-org
+git-sentinel repos list --org example-org --format json
+git-sentinel repos list --user example-user --visibility public --format yaml
 ```
 
 ## What It Does

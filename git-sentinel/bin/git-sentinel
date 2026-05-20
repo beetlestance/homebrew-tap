@@ -26,17 +26,24 @@ VERSION="git-sentinel v2.0.1"
 CONFIG_PATH="./sentinel.yml"
 COMMAND=""
 DRY_RUN=false
+REPOS_COMMAND=""
+REPOS_OWNER_TYPE=""
+REPOS_OWNER=""
+REPOS_FORMAT="table"
+REPOS_VISIBILITY="all"
+REPOS_ARCHIVED="false"
 
 # ---------------------------------------------------------------------------
 # Usage
 # ---------------------------------------------------------------------------
 usage() {
   cat <<EOF
-Usage: git-sentinel <command> [--config <path>] [--dry-run]
+Usage: git-sentinel <command> [options]
 
 Commands:
   init      Create a new repo from sentinel.yml
   enforce   Apply/update rulesets and files on existing repo
+  repos     Discover repositories under an org or personal account
   schema    Print fully annotated sentinel.yml to stdout
   help      Show this usage message
   version   Show installed version
@@ -44,6 +51,10 @@ Commands:
 Options:
   --config <path>   Path to config file (default: ./sentinel.yml)
   --dry-run         Validate config and show planned changes without applying them
+
+Repo discovery:
+  git-sentinel repos list --org <org> [--format table|json|yaml]
+  git-sentinel repos list --user <user> [--visibility all|public|private]
 EOF
 }
 
@@ -56,6 +67,20 @@ while [[ $# -gt 0 ]]; do
       COMMAND="$1"
       shift
       ;;
+    repos)
+      COMMAND="repos"
+      shift
+      ;;
+    list)
+      if [[ "$COMMAND" == "repos" ]]; then
+        REPOS_COMMAND="list"
+        shift
+      else
+        log_fail "unknown argument: $1"
+        usage
+        exit 1
+      fi
+      ;;
     --config)
       if [[ $# -lt 2 ]]; then
         log_fail "--config requires a path argument"
@@ -67,6 +92,48 @@ while [[ $# -gt 0 ]]; do
     --dry-run)
       DRY_RUN=true
       shift
+      ;;
+    --org)
+      if [[ $# -lt 2 ]]; then
+        log_fail "--org requires a value"
+        exit 1
+      fi
+      REPOS_OWNER_TYPE="org"
+      REPOS_OWNER="$2"
+      shift 2
+      ;;
+    --user)
+      if [[ $# -lt 2 ]]; then
+        log_fail "--user requires a value"
+        exit 1
+      fi
+      REPOS_OWNER_TYPE="user"
+      REPOS_OWNER="$2"
+      shift 2
+      ;;
+    --format)
+      if [[ $# -lt 2 ]]; then
+        log_fail "--format requires a value"
+        exit 1
+      fi
+      REPOS_FORMAT="$2"
+      shift 2
+      ;;
+    --visibility)
+      if [[ $# -lt 2 ]]; then
+        log_fail "--visibility requires a value"
+        exit 1
+      fi
+      REPOS_VISIBILITY="$2"
+      shift 2
+      ;;
+    --archived)
+      if [[ $# -lt 2 ]]; then
+        log_fail "--archived requires a value"
+        exit 1
+      fi
+      REPOS_ARCHIVED="$2"
+      shift 2
       ;;
     *)
       log_fail "unknown argument: $1"
@@ -179,6 +246,12 @@ cmd_enforce() {
 case "${COMMAND}" in
   init)    cmd_init ;;
   enforce) cmd_enforce ;;
+  repos)
+    case "$REPOS_COMMAND" in
+      list) repos_list ;;
+      *) repos_usage; exit 1 ;;
+    esac
+    ;;
   schema)  schema ;;
   help)    usage ;;
   version) echo "$VERSION" ;;
