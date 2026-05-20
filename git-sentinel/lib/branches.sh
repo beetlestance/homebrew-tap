@@ -8,7 +8,7 @@ ensure_branches() {
     git commit --allow-empty -m "Initial commit" --quiet
   fi
 
-  for branch in "${BRANCHES[@]}"; do
+  for branch in ${BRANCHES[@]+"${BRANCHES[@]}"}; do
     if git ls-remote --heads origin "$branch" 2>/dev/null | grep -q "$branch"; then
       log_skip "branch: $branch (already on remote)"
       continue
@@ -38,7 +38,7 @@ ensure_branches() {
 sync_non_default_branches() {
   local branch
 
-  for branch in "${BRANCHES[@]}"; do
+  for branch in ${BRANCHES[@]+"${BRANCHES[@]}"}; do
     if [[ "$branch" == "$DEFAULT_BRANCH" ]]; then
       continue
     fi

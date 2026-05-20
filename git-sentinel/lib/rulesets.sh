@@ -8,7 +8,7 @@ resolve_bypass_actors() {
   local actors="[]"
   local user user_id team team_id app app_id
 
-  for user in "${BYPASS_USERS[@]}"; do
+  for user in ${BYPASS_USERS[@]+"${BYPASS_USERS[@]}"}; do
     user_id=$(gh_api "/users/$user" --jq '.id' 2>/dev/null) || {
       log_fail "failed to resolve bypass user: $user"
       return "$EXIT_GITHUB_ERROR"
@@ -18,7 +18,7 @@ resolve_bypass_actors() {
       '. + [{ actor_id: $id, actor_type: "User", bypass_mode: "always" }]')
   done
 
-  for team in "${BYPASS_TEAMS[@]}"; do
+  for team in ${BYPASS_TEAMS[@]+"${BYPASS_TEAMS[@]}"}; do
     team_id=$(gh_api "/orgs/$ORG/teams/$team" --jq '.id' 2>/dev/null) || {
       log_fail "failed to resolve bypass team: $team"
       return "$EXIT_GITHUB_ERROR"
@@ -28,7 +28,7 @@ resolve_bypass_actors() {
       '. + [{ actor_id: $id, actor_type: "Team", bypass_mode: "always" }]')
   done
 
-  for app in "${BYPASS_APPS[@]}"; do
+  for app in ${BYPASS_APPS[@]+"${BYPASS_APPS[@]}"}; do
     app_id=$(gh_api "/apps/$app" --jq '.id' 2>/dev/null) || {
       log_fail "failed to resolve bypass app: $app"
       return "$EXIT_GITHUB_ERROR"
@@ -160,7 +160,7 @@ create_or_update_ruleset_payload() {
 apply_ruleset_payloads() {
   local ruleset_path name payload
 
-  for ruleset_path in "${RULESET_PATHS[@]}"; do
+  for ruleset_path in ${RULESET_PATHS[@]+"${RULESET_PATHS[@]}"}; do
     name=$(jq -r '.name' "$ruleset_path")
     payload=$(jq -c '.' "$ruleset_path")
     create_or_update_ruleset_payload "$ruleset_path" "$name" "$payload"
@@ -174,7 +174,7 @@ apply_rulesets() {
   fi
 
   local branch
-  for branch in "${BRANCHES[@]}"; do
+  for branch in ${BRANCHES[@]+"${BRANCHES[@]}"}; do
     if [[ "$branch" == "$DEFAULT_BRANCH" ]]; then
       create_or_update_ruleset "protect-$branch" "refs/heads/$branch" 0 '["squash"]' false
     else

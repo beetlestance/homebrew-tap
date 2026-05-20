@@ -58,7 +58,7 @@ generate_git_reference() {
 
   local release_branch="$DEFAULT_BRANCH"
   local branch
-  for branch in "${BRANCHES[@]}"; do
+  for branch in ${BRANCHES[@]+"${BRANCHES[@]}"}; do
     if [[ "$branch" != "$DEFAULT_BRANCH" ]]; then
       release_branch="$branch"
       break

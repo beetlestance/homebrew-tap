@@ -49,7 +49,7 @@ diff_check_branches() {
   remote_branches=$(gh_api "/repos/$ORG/$REPO_NAME/branches?per_page=100" --paginate \
     | jq -r '.[].name')
 
-  for branch in "${BRANCHES[@]}"; do
+  for branch in ${BRANCHES[@]+"${BRANCHES[@]}"}; do
     if grep -Fxq "$branch" <<<"$remote_branches"; then
       diff_ok "branch exists: $branch"
     else
@@ -124,7 +124,7 @@ diff_check_json_rulesets() {
   local remote_list ruleset_path name id expected_file current_file
   remote_list=$(gh_api "/repos/$ORG/$REPO_NAME/rulesets")
 
-  for ruleset_path in "${RULESET_PATHS[@]}"; do
+  for ruleset_path in ${RULESET_PATHS[@]+"${RULESET_PATHS[@]}"}; do
     name=$(jq -r '.name' "$ruleset_path")
     id=$(echo "$remote_list" | jq -r --arg name "$name" \
       'if type=="array" then (.[] | select(.name == $name) | .id) else empty end')
@@ -157,7 +157,7 @@ diff_check_generated_rulesets() {
   local remote_list branch name
   remote_list=$(gh_api "/repos/$ORG/$REPO_NAME/rulesets")
 
-  for branch in "${BRANCHES[@]}"; do
+  for branch in ${BRANCHES[@]+"${BRANCHES[@]}"}; do
     name="protect-$branch"
     if echo "$remote_list" | jq -e --arg name "$name" \
       'if type=="array" then any(.[]; .name == $name) else false end' >/dev/null; then
@@ -252,7 +252,7 @@ diff_check_collaborators() {
     return
   fi
 
-  for user in "${COLLABORATORS[@]}"; do
+  for user in ${COLLABORATORS[@]+"${COLLABORATORS[@]}"}; do
     if gh_api "/repos/$ORG/$REPO_NAME/collaborators/$user/permission" >/dev/null 2>&1; then
       diff_ok "collaborator has access: $user"
     else

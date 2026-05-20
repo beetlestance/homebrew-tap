@@ -42,20 +42,20 @@ plan_files() {
   )
 
   plan_list_items "files to generate or update" \
-    "${files[@]}"
+    ${files[@]+"${files[@]}"}
 
-  plan_list_items "templates to inject" "${TEMPLATES[@]}"
+  plan_list_items "templates to inject" ${TEMPLATES[@]+"${TEMPLATES[@]}"}
 }
 
 plan_rulesets() {
   if [[ "${#RULESET_PATHS[@]}" -gt 0 ]]; then
-    plan_list_items "ruleset JSON files to apply" "${RULESET_PATHS[@]}"
+    plan_list_items "ruleset JSON files to apply" ${RULESET_PATHS[@]+"${RULESET_PATHS[@]}"}
     return
   fi
 
   local rulesets=()
   local branch
-  for branch in "${BRANCHES[@]}"; do
+  for branch in ${BRANCHES[@]+"${BRANCHES[@]}"}; do
     if [[ "$branch" == "$DEFAULT_BRANCH" ]]; then
       rulesets+=("protect-$branch: PR required, 0 approving reviews, squash merge only, linear history")
     else
@@ -63,10 +63,10 @@ plan_rulesets() {
     fi
   done
 
-  plan_list_items "rulesets to apply" "${rulesets[@]}"
-  plan_list_items "bypass users" "${BYPASS_USERS[@]}"
-  plan_list_items "bypass teams" "${BYPASS_TEAMS[@]}"
-  plan_list_items "bypass apps" "${BYPASS_APPS[@]}"
+  plan_list_items "rulesets to apply" ${rulesets[@]+"${rulesets[@]}"}
+  plan_list_items "bypass users" ${BYPASS_USERS[@]+"${BYPASS_USERS[@]}"}
+  plan_list_items "bypass teams" ${BYPASS_TEAMS[@]+"${BYPASS_TEAMS[@]}"}
+  plan_list_items "bypass apps" ${BYPASS_APPS[@]+"${BYPASS_APPS[@]}"}
 }
 
 plan_branch_actions() {
@@ -74,7 +74,7 @@ plan_branch_actions() {
   local actions=()
   local branch
 
-  for branch in "${BRANCHES[@]}"; do
+  for branch in ${BRANCHES[@]+"${BRANCHES[@]}"}; do
     if [[ "$mode" == "init" ]]; then
       actions+=("create or push $branch")
     else
@@ -86,17 +86,17 @@ plan_branch_actions() {
 
   if [[ "$mode" == "init" ]]; then
     actions+=("commit generated files to $DEFAULT_BRANCH")
-    for branch in "${BRANCHES[@]}"; do
+    for branch in ${BRANCHES[@]+"${BRANCHES[@]}"}; do
       [[ "$branch" == "$DEFAULT_BRANCH" ]] || actions+=("fast-forward $branch to $DEFAULT_BRANCH")
     done
   else
     actions+=("commit generated changes to $DEFAULT_BRANCH if needed")
-    for branch in "${BRANCHES[@]}"; do
+    for branch in ${BRANCHES[@]+"${BRANCHES[@]}"}; do
       [[ "$branch" == "$DEFAULT_BRANCH" ]] || actions+=("fast-forward $branch to $DEFAULT_BRANCH if changes were committed")
     done
   fi
 
-  plan_list_items "branch actions" "${actions[@]}"
+  plan_list_items "branch actions" ${actions[@]+"${actions[@]}"}
 }
 
 plan_init() {
@@ -109,7 +109,7 @@ plan_init() {
   plan_branch_actions "init"
   plan_files
   plan_rulesets
-  plan_list_items "collaborators to add" "${COLLABORATORS[@]}"
+  plan_list_items "collaborators to add" ${COLLABORATORS[@]+"${COLLABORATORS[@]}"}
   plan_list_items "cleanup actions" "remove $CONFIG_PATH from working tree"
   log_ok "dry run complete — no changes made"
 }
@@ -123,6 +123,6 @@ plan_enforce() {
   plan_branch_actions "enforce"
   plan_files
   plan_rulesets
-  plan_list_items "collaborators to add" "${COLLABORATORS[@]}"
+  plan_list_items "collaborators to add" ${COLLABORATORS[@]+"${COLLABORATORS[@]}"}
   log_ok "dry run complete — no changes made"
 }

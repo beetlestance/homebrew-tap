@@ -99,16 +99,16 @@ parse_config() {
   fi
 
   local resolved=()
-  for tmpl in "${TEMPLATES[@]}"; do
+  for tmpl in ${TEMPLATES[@]+"${TEMPLATES[@]}"}; do
     resolved+=("$(resolve_config_path "$tmpl" "$config_dir")")
   done
-  TEMPLATES=("${resolved[@]}")
+  TEMPLATES=(${resolved[@]+"${resolved[@]}"})
 
   resolved=()
-  for ruleset in "${RULESET_PATHS[@]}"; do
+  for ruleset in ${RULESET_PATHS[@]+"${RULESET_PATHS[@]}"}; do
     resolved+=("$(resolve_config_path "$ruleset" "$config_dir")")
   done
-  RULESET_PATHS=("${resolved[@]}")
+  RULESET_PATHS=(${resolved[@]+"${resolved[@]}"})
 }
 
 validate_config() {
@@ -124,7 +124,7 @@ validate_config() {
   fi
 
   local branch default_found=false
-  for branch in "${BRANCHES[@]}"; do
+  for branch in ${BRANCHES[@]+"${BRANCHES[@]}"}; do
     if [[ "$branch" =~ [[:space:]] || "$branch" == refs/* || "$branch" == "" ]]; then
       log_fail "invalid branch name in $CONFIG_PATH: $branch"
       exit "$EXIT_CONFIG_ERROR"
@@ -145,14 +145,14 @@ validate_config() {
     exit "$EXIT_CONFIG_ERROR"
   fi
 
-  for tmpl in "${TEMPLATES[@]}"; do
+  for tmpl in ${TEMPLATES[@]+"${TEMPLATES[@]}"}; do
     if [[ ! -f "$tmpl" && ! -d "$tmpl" ]]; then
       log_fail "template path does not exist: $tmpl"
       exit "$EXIT_CONFIG_ERROR"
     fi
   done
 
-  for ruleset in "${RULESET_PATHS[@]}"; do
+  for ruleset in ${RULESET_PATHS[@]+"${RULESET_PATHS[@]}"}; do
     if [[ ! -f "$ruleset" ]]; then
       log_fail "ruleset path does not exist: $ruleset"
       exit "$EXIT_CONFIG_ERROR"
